@@ -1,0 +1,7 @@
+*.pyc
+*.so
+/octave-workspace
+/fea.py
+/bemt.py
+/_bemt.pyd
+/_fea.pyd

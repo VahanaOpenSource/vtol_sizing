@@ -1,0 +1,572 @@
+# weight - lb
+# length, diameter - in
+Turboshaft:
+   eng000:
+     Model:        '250-C18'
+     Manufacturer: 'Allison/Rolls-Royce'
+     power_to:     317
+     sfc_to:       0.697
+     weight:       141
+     cost:         -1.0
+     length:       40.5
+     diameter:     19
+   eng001:
+     Model:         '250-C20B'
+     Manufacturer:  'Allison/Rolls-Royce'
+     power_to:      420
+     sfc_to:        0.65
+     weight:        161
+     cost:          323400
+     length:        38.8
+     diameter:      19
+   eng002:
+     Model:          '250-C30R3'
+     Manufacturer:   'Allison/Rolls-Royce'
+     power_to:       650
+     sfc_to:         0.584
+     weight:         274
+     cost:           265600
+     length:         43
+     diameter:       22
+   eng003:
+     Model:          '250-C40B'
+     Manufacturer:   'Allison/Rolls-Royce'
+     power_to:       715
+     sfc_to:         0.574
+     weight:         280
+     cost:           335000
+     length:         43
+     diameter:       22
+   eng004:
+     Model:          'AE 1107C'
+     Manufacturer:   'Allison/Rolls-Royce'
+     power_to:       6150
+     sfc_to:         0.4
+     weight:         971
+     cost:           2200000
+     length:         78
+     diameter:       34
+   eng005:
+     Model:          'T-55-714'
+     Manufacturer:   'Lycoming/Honeywell'
+     power_to:       4867
+     sfc_to:         0.51
+     weight:         831
+     cost:           1060000
+     length:         47
+     diameter:       24
+   eng006:
+     Model:          'T-64'
+     Manufacturer:   'General Electric'
+     power_to:       4330
+     sfc_to:         0.48
+     weight:         720
+     cost:           1270000
+     length:         79
+     diameter:       20
+   eng007:
+     Model:          'T700-GE-701'
+     Manufacturer:   'General Electric'
+     power_to:       1994
+     sfc_to:         0.43
+     weight:         456
+     cost:           756000
+     length:         15.6
+     diameter:       46
+   eng008:
+     Model:          'T700-GE-701D'
+     Manufacturer:   'General Electric'
+     power_to:       2380
+     sfc_to:         0.43
+     weight:         537
+     cost:           756000
+     length:         15.6
+     diameter:       46
+   eng009:
+     Model:          'GE38-113'
+     Manufacturer:   'General Electric'
+     power_to:       7500
+     sfc_to:         0.39
+     weight:         1105
+     cost:           4000000
+     length:         57.5
+     diameter:       27
+   eng010:
+     Model:          'Turmo IIIC7'
+     Manufacturer:   'Turbomeca'
+     power_to:       1632
+     sfc_to:         0.63
+     weight:         716
+     cost:           ""
+     length:         71.6
+     diameter:       28.2
+   eng011:
+     Model:          'TV3-117VMA'
+     Manufacturer:   'Klimov'
+     power_to:       2800
+     sfc_to:         0.507
+     weight:         648
+     cost:           615000
+     length:         81
+     diameter:       29
+   eng012:
+     Model:          'TV7-117VMA'
+     Manufacturer:   'Klimov'
+     power_to:       2800
+     sfc_to:         0.43
+     weight:         790
+     cost:           500000
+     length:         63.5
+     diameter:       29
+   eng013:
+     Model:          'LTS-101-750'
+     Manufacturer:   'Lycoming/Honeywell'
+     power_to:       742
+     sfc_to:         0.57
+     weight:         268
+     cost:           125000
+     length:         32.4
+     diameter:       24.7
+   eng014:
+     Model:          '250-B17C'
+     Manufacturer:   'Allison/Rolls-Royce'
+     power_to:       420
+     sfc_to:         0.657
+     weight:         198
+     cost:           250000
+     length:         45
+     diameter:       19
+   eng015:
+     Model:          '250-B17D'
+     Manufacturer:   'Allison/Rolls-Royce'
+     power_to:       420
+     sfc_to:         0.657
+     weight:         202
+     cost:           250000
+     length:         45
+     diameter:       19
+   eng016:
+     Model:          '250-B17E'
+     Manufacturer:   'Allison/Rolls-Royce'
+     power_to:       420
+     sfc_to:         0.656
+     weight:         202
+     cost:           250000
+     length:         45
+     diameter:       19
+   eng017:
+     Model:           '250-B17F'
+     Manufacturer:    'Allison/Rolls-Royce'
+     power_to:        450
+     sfc_to:          0.613
+     weight:          212
+     cost:            300000
+     length:          45
+     diameter:        19
+   eng018:
+     Model:           'AE 2100D3'
+     Manufacturer:    'Allison/Rolls-Royce'
+     power_to:        4637
+     sfc_to:          0.41
+     weight:          1925
+     cost:            3100000
+     length:          124
+     diameter:        29
+   eng019:
+     Model:           'RR300'
+     Manufacturer:    'Rolls-Royce'
+     power_to:        240
+     sfc_to:          0.675
+     weight:          176
+     cost:            150000
+     length:          41
+     diameter:        21
+   eng020:
+     Model:           'RR300'
+     Manufacturer:    'Rolls-Royce'
+     power_to:        300
+     sfc_to:          0.756
+     weight:          176
+     cost:            150000
+     length:          41
+     diameter:        21
+   eng021:
+     Model:           'T62-S'
+     Manufacturer:    'Solar'
+     power_to:        150
+     sfc_to:          1.42
+     weight:          142
+     cost:            -1.0
+     length:          -1.0
+     diameter:        -1.0
+   eng022:
+     Model:           'Artouste IIIB'
+     Manufacturer:    'Turbomeca'
+     power_to:        570
+     sfc_to:          0.76
+     weight:          254
+     cost:            -1.0
+     length:          -1.0
+     diameter:        -1.0
+   eng023:
+     Model:           'Arriel 1B'
+     Manufacturer:    'Turbomeca'
+     power_to:        641
+     sfc_to:          0.573
+     weight:          265
+     cost:            -1.0
+     length:          -1.0
+     diameter:        -1.0
+   eng024:
+     Model:           'T53'
+     Manufacturer:    'Lycoming/Honeywell'
+     power_to:        1100
+     sfc_to:          0.58
+     weight:          545
+     cost:            -1.0 
+     length:          -1.0 
+     diameter:        -1.0 
+   eng025:
+     Model:           'T-55-712'
+     Manufacturer:    'Lycoming/Honeywell'
+     power_to:        3750
+     sfc_to:          0.52
+     weight:          760
+     cost:            -1.0
+     length:          -1.0
+     diameter:        -1.0
+   eng026:
+     Model:           'Gnome H.1400'
+     Manufacturer:    'De Havilland'
+     power_to:        1660
+     sfc_to:          0.62
+     weight:          326
+     cost:            -1.0
+     length:          -1.0
+     diameter:        -1.0
+   eng027:
+     Model:           'T-58-10'
+     Manufacturer:    'General Electric'
+     power_to:        1400
+     sfc_to:          0.62
+     weight:          350
+     cost:            -1.0
+     length:          59
+     diameter:        20
+   eng028:
+     Model:           'T-58-16'
+     Manufacturer:    'General Electric'
+     power_to:        1870
+     sfc_to:          0.53
+     weight:          440
+     cost:            -1.0
+     length:          63
+     diameter:        24
+   eng029:
+     Model:           'T-58-5'
+     Manufacturer:    'General Electric'
+     power_to:        1500
+     sfc_to:          0.6
+     weight:          335
+     cost:            -1.0
+     length:          59
+     diameter:        21
+   eng030:
+     Model:           'T64-GE-100'
+     Manufacturer:    'General Electric'
+     power_to:        4330
+     sfc_to:          0.48
+     weight:          720
+     cost:            -1.0
+     length:          79
+     diameter:        24.2
+   eng031:
+     Model:           'T64-GE-16A'
+     Manufacturer:    'General Electric'
+     power_to:        3485
+     sfc_to:          0.48
+     weight:          720
+     cost:            -1.0
+     length:          79
+     diameter:        24.2
+   eng032:
+     Model:           'T64-GE-413'
+     Manufacturer:    'General Electric'
+     power_to:        3925
+     sfc_to:          0.47
+     weight:          720
+     cost:            -1.0
+     length:          79
+     diameter:        24.2
+   eng033:
+     Model:           'T64-GE-415'
+     Manufacturer:    'General Electric'
+     power_to:        4380
+     sfc_to:          0.47
+     weight:          720
+     cost:            -1.0
+     length:          79
+     diameter:        24.2
+   eng034:
+     Model:           'T64-GE-7A'
+     Manufacturer:    'General Electric'
+     power_to:        3936
+     sfc_to:          0.47
+     weight:          720
+     cost:            -1.0
+     length:          79
+     diameter:        20.1
+   eng035:
+     Model:           'T700-GE-T6E'
+     Manufacturer:    'General Electric'
+     power_to:        2270
+     sfc_to:          0.434
+     weight:          531
+     cost:            -1.0
+     length:          48
+     diameter:        25
+   eng036:
+     Model:           'T700-GE-T6E-1'
+     Manufacturer:    'General Electric'
+     power_to:        2270
+     sfc_to:          0.434
+     weight:          537
+     cost:            -1.0
+     length:          48
+     diameter:        25
+   eng037:
+     Model:           'CTS800-2'
+     Manufacturer:    'LHTEC'
+     power_to:        1360
+     sfc_to:          0.448
+     weight:          383
+     cost:            -1.0
+     length:          41
+     diameter:        28
+   eng038:
+     Model:           'T64-MTU-7'
+     Manufacturer:    'MTU'
+     power_to:        3925
+     sfc_to:          0.48
+     weight:          712
+     cost:            -1.0
+     length:          79
+     diameter:        20.1
+   eng039:
+     Model:           'MTR 390'
+     Manufacturer:    'MTU'
+     power_to:        1556
+     sfc_to:          0.46
+     weight:          373
+     cost:            -1.0
+     length:          42.4
+     diameter:        26.9
+   eng040:
+     Model:           'PT6B-36'
+     Manufacturer:    'PWC'
+     power_to:        981
+     sfc_to:          0.594
+     weight:          372
+     cost:            -1.0
+     length:          59
+     diameter:        20
+   eng041:
+     Model:           'PT6T-3B-1'
+     Manufacturer:    'PWC'
+     power_to:        1800
+     sfc_to:          0.596
+     weight:          660
+     cost:            -1.0
+     length:          67
+     diameter:        44
+   eng042:
+     Model:           'D-136'
+     Manufacturer:    'Progress'
+     power_to:        11400
+     sfc_to:          0.456
+     weight:          2315
+     cost:            -1.0
+     length:          146
+     diameter:        55
+   eng043:
+     Model:           'Gem 2 Mk.1001'
+     Manufacturer:    'Rolls-Royce'
+     power_to:        825
+     sfc_to:          0.52
+     weight:          393
+     cost:            -1.0
+     length:          43
+     diameter:        24
+   eng044:
+     Model:           'RTM 322-01/8'
+     Manufacturer:    'Rolls-Royce'
+     power_to:        2200
+     sfc_to:          0.45
+     weight:          539
+     cost:            -1.0
+     length:          46.1
+     diameter:        26
+   eng045:
+     Model:           'RTM 322-01/9'
+     Manufacturer:    'Rolls-Royce'
+     power_to:        2430
+     sfc_to:          0.42
+     weight:          499
+     cost:            -1.0
+     length:          46.1
+     diameter:        26
+   eng046:
+     Model:           'Makila A1'
+     Manufacturer:    'Turbomeca'
+     power_to:        1877
+     sfc_to:          0.481
+     weight:          353
+     cost:            -1.0
+     length:          55
+     diameter:        20
+   eng047:
+     Model:           'LTS 101-600A-2'
+     Manufacturer:    'Lycoming/Honeywell'
+     power_to:        615
+     sfc_to:          0.571
+     weight:          253
+     cost:            -1.0
+     length:          30.9
+     diameter:        22.4
+   eng048:
+     Model:           'LTS 101-600A-3'
+     Manufacturer:    'Lycoming/Honeywell'
+     power_to:        615
+     sfc_to:          0.582
+     weight:          265
+     cost:            -1.0
+     length:          31.5
+     diameter:        22.4
+   eng049:
+     Model:           'LTS 101-650B-1'
+     Manufacturer:    'Lycoming/Honeywell'
+     power_to:        650
+     sfc_to:          0.577
+     weight:          273
+     cost:            -1.0
+     length:          31.1
+     diameter:        25.4
+   eng050:
+     Model:           'LTS 101-650C-2'
+     Manufacturer:    'Lycoming/Honeywell'
+     power_to:        675
+     sfc_to:          0.572
+     weight:          241
+     cost:            -1.0
+     length:          31.3
+     diameter:        22.6
+   eng051:
+     Model:           'LTS 101-650C-3'
+     Manufacturer:    'Lycoming/Honeywell'
+     power_to:        675
+     sfc_to:          0.572
+     weight:          241
+     cost:            -1.0
+     length:          31.3
+     diameter:        22.6
+   eng052:
+     Model:           'LTS 101-650C-3A'
+     Manufacturer:    'Lycoming/Honeywell'
+     power_to:        675
+     sfc_to:          0.572
+     weight:          241
+     cost:            -1.0
+     length:          31.3
+     diameter:        22.6
+   eng053:
+     Model:           'LTS 101-750B-1'
+     Manufacturer:    'Lycoming/Honeywell'
+     power_to:        727
+     sfc_to:          0.577
+     weight:          271
+     cost:            -1.0
+     length:          31.3
+     diameter:        25.4
+   eng054:
+     Model:           'LTS 101-750B-2'
+     Manufacturer:    'Lycoming/Honeywell'
+     power_to:        742
+     sfc_to:          0.57
+     weight:          268
+     cost:            -1.0
+     length:          32.4
+     diameter:        24.7
+   eng055:
+     Model:           'LTS 101-750C-1'
+     Manufacturer:    'Lycoming/Honeywell'
+     power_to:        735
+     sfc_to:          0.577
+     weight:          244
+     cost:            -1.0
+     length:          31.3
+     diameter:        22.6
+   eng056:
+     Model:           'CT7-2D'
+     Manufacturer:    'General Electric'
+     power_to:        1625
+     sfc_to:          0.473
+     weight:          442
+     cost:            -1.0
+     length:          47
+     diameter:        26
+   eng057:
+     Model:           'CT7-2D1'
+     Manufacturer:    'General Electric'
+     power_to:        1625
+     sfc_to:          0.473
+     weight:          466
+     cost:            -1.0
+     length:          47
+     diameter:        26
+   eng058:
+     Model:           'CT7-6'
+     Manufacturer:    'General Electric'
+     power_to:        200
+     sfc_to:          0.47
+     weight:          493
+     cost:            -1.0
+     length:          48
+     diameter:        26
+   eng059:
+     Model:           'JTFTD12A-4A'
+     Manufacturer:    'PWC'
+     power_to:        4500
+     sfc_to:          0.69
+     weight:          920
+     cost:            -1.0
+     length:          -1.0
+     diameter:        34
+   eng060:
+     Model:           'JTFTD12A-5A'
+     Manufacturer:    'PWC'
+     power_to:        4800
+     sfc_to:          0.68
+     weight:          935
+     cost:            -1.0
+     length:          -1.0
+     diameter:        34
+   eng061:
+     Model:           'PW206A'
+     Manufacturer:    'PWC'
+     power_to:        640
+     sfc_to:          0.543
+     weight:          237
+     cost:            -1.0
+     length:          35.9
+     diameter:        22.3
+   eng062:
+     Model:           'PW206B'
+     Manufacturer:    'PWC'
+     power_to:        635
+     sfc_to:          0.548
+     weight:          237
+     cost:            -1.0
+     length:          41
+     diameter:        24.7
+
+

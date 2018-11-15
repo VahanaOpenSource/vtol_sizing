@@ -1,0 +1,73 @@
+Sizing:
+   disk_loading:       [10.91]             # in meters for radius, lb/sq.ft for DL
+   number_blades:      [3]                # per rotor
+   tip_speed:          [171.25]           # hover tip speed, m/s
+   rotor_solidity:     [0.105]  # rotor geometric solidity 
+   fl_freq:            [1.1]              # not relevant when using iblade=1
+   cruise_RPM_ratio:   [0.4]              # [0.2,0.25,0.3,0.35,0.4]
+
+   Wings:
+      Canard:
+         nwing:            [1]
+         aspectratio:      [9.206] 
+         cl:               [0.642]
+         rotors_per_wing:  [4]
+      Main:
+         nwing:            [1]
+         aspectratio:      [6.905]       # structural AR 
+         cl:               [0.482]
+         liftfraction:     [0.5]
+         rotors_per_wing:  [4]
+
+# fidelity options for weight and performance models
+   ifea:               0         # set to 1 for beam lattice model: to be set up!
+   iblade:             1         # set to 1 to use physics-based: need to revise hub weight, actuator
+   icomprehensive:     0         # do not use comprehensive analysis
+   use_bemt:           False
+
+# note: 4k95 = 1219.2 m, ISA + 27.92 C, 6k59 = 1828.8 m, ISA + 11.88 C
+# flight mode: 0-idle, 1-hover, 3-cruise
+Mission:
+   nsegments:          4
+   time_seg:           [    1.5,   15.0,    1.5,      0   ] # minutes
+   flight_mode:        [      1,      3,      1,      3   ]
+   start_altitude:     [    0.0,   00.0,      0,      0   ] # m
+   end_altitude:       [    0.0,    0.0,      0,      0   ] # m
+   delta_temp_isa:     [    0.0,    0.0,      0,      0   ] # centrigrade
+   rate_of_climb:      [      0,      0,      0,      0   ] # m/min
+   cruise_speed:       [      0,     98,      0,     98   ] # knots
+   add_payload:        [      0,      0,      0,      0   ] # jettison/pick up additional payload at end of segment
+   segment_type:       [  'all',  'all',  'all', 'reserve'] # all = use for sizing and cost; reserve = sizing only
+# fixed GTOW: find payload for a given mission
+   fixed_GTOW:         735.0                       # GTOW: find payload for given mission
+
+Aircraft:
+   aircraftID: 2
+   # 1: SMR, 3: Coax, 4: Quadrotor (needs to be improved), 5: custom
+
+   # payload, crew (kg)
+   mass_payload:      0.8
+   mass_crew:         0 
+   avionics:         79.2
+   common_equipment:  0.0        # HVAC systems
+   common_per_pax:    0
+   pax_count:         0          # number of passengers (uses pax -> baggage map)
+
+   # rotor parameters ("lift")
+   nrotor:            8
+
+   # propeller parameters ("Cruise")
+   npropeller:        0
+
+   # engine parameters
+   nengine:           8
+   engineType:       'electric_motor' 
+
+Paths:
+   prasadum: 'dummypath'
+
+# -------------------------------------------------------------------
+# NOTES
+# -------------------------------------------------------------------
+# - Sizing inputs can have either [blade_aspect_ratio OR rotor_solidity],
+#   [disk_loading OR rotor_radius] as inputs, but NOT both

@@ -1,0 +1,9 @@
+*.so
+/_hydra.so
+/hydra.py
+/Asymmetric/
+/PowerCurve/
+/Symmetric/
+*.dat
+*.pyd
+*.pyc

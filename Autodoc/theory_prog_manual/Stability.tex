@@ -1,0 +1,165 @@
+\section{Extraction of Linearized Models}
+Models that represent the linearized dynamics of a system in the neighborhood of an equilibrium point (trim condition) can be used to gain insight into system stability characteristics. Consider the dynamics represented by Eqs. (\ref{eqn:allodes}). Expanding the left hand side in a Taylor series, we obtain
+\begin{equation}
+\vector{f} \quad + \quad \frac{\partial \vector{f}}{\partial \dot{\vector{y}}} \Delta \dot{\vector{y}} \quad + \quad \frac{\partial \vector{f}}{\partial \vector{y}} \Delta \vector{y} \quad + \quad \frac{\partial \vector{f}}{\partial \vector{u}} \Delta \vector{u} \quad + \quad \cdots \quad = \quad \grkvec{\epsilon} \quad
+\end{equation}
+At equilibrium (trim), $\vector{f}$ = $\grkvec{\epsilon}$ $\stackrel{\text{def}}{=}$ $\vector{0}$. Let the Jacobian matrices be 
+\[ \textbf{E} \quad = \quad \frac{\partial \grkvec{\epsilon}}{\partial \dot{\vector{y}}}\biggr\rvert_\textrm{trim} \qquad \textrm{;} \qquad \textbf{F} \quad = \quad \frac{\partial \grkvec{\epsilon}}{\partial \vector{y}}\biggr\rvert_\textrm{trim} \qquad \textrm{;} \qquad \textbf{G} \quad = \quad \frac{\partial \grkvec{\epsilon}}{\partial \vector{u}}\biggr\rvert_\textrm{trim} \]
+ Neglecting the higher-order terms, we obtain the linearized system dynamics about equilibrium, given by 
+\begin{equation}
+\textbf{E} \textrm{ }\Delta \dot{\vector{y}} \quad + \quad \textbf{F} \textrm{ }\Delta \vector{y} \quad + \quad \textbf{G} \textrm{ }\Delta \vector{u} \quad = \quad \vector{0}
+\end{equation}
+Rearranging the equations and isolating $\Delta \dot{\vector{y}}$, we obtain
+\begin{align}
+\label{eqn:lindyn}
+\Delta \dot{\vector{y}} \quad = \quad &\textbf{A} \textrm{ }\Delta \vector{y} \quad + \textbf{B} \textrm{ }\Delta \vector{u} \\
+\textrm{Where} \qquad \qquad \qquad & \qquad \qquad \qquad \qquad \qquad \qquad \notag \\
+\textbf{A} \quad = \quad &-\textbf{E}^{-1} \textbf{F} \notag \\
+\textbf{B} \quad = \quad &-\textbf{E}^{-1} \textbf{G} \notag 
+\end{align}
+The linearization process is performed by the routine \textbf{linrzODEs}, which calls \textbf{ODEResiduals} repeatedly. Using Eq. (\ref{eqn:lindyn}) and an appropriate state-to-output conversion matrix \textbf{C}, transfer functions between \textit{pilot inputs} and system outputs for the relevant physical quantities can be constructed as 
+\begin{equation}
+\textbf{H}(s) \quad = \quad \textbf{C} \textrm{ }\left(s \textrm{ }\textbf{I} \textrm{ }- \textrm{ }\textbf{A}_\textrm{NR}\right)^{-1} \spc\textbf{B}_\textrm{NR} \spc + \spc \textbf{D}
+\end{equation}
+The transfer function magnitude and phase are obtained from the system \textbf{A} and \textbf{B} matrices using a wrapper routine \textbf{freq\_response\_wrapper} for a NETLIB program. 
+
+\subsection{Multiblade Coordinate Transform}
+Before the system frequency response can be constructed, it is necessary to obtain the system \textbf{A}  and \textbf{B} matrices in the fixed frame. However, the \textbf{A} and \textbf{B} matrices obtained from the application of finite-difference perturbations on \textbf{ODEResiduals} are azimuth dependent, since the rotor states are defined in the rotating preconed undeformed axes. Therefore, an additional coordinate transform is required to convert the resulting \textbf{A} and \textbf{B} matrices to the fixed frame.
+
+Let the matrix \textbf{P} represent the time-varying coordinate transform that converts the system states from the fixed frame to the rotating frame, and let \textbf{y$_\textrm{NR}$} denote the system state vector in the fixed frame. By definition,
+\[ \textbf{y}(t) \quad = \quad \textbf{P}(t) \spc \textbf{y}_\textrm{NR}(t) \]
+
+Substituting the above expression in the linearized governing equations
+\begin{align*}
+\vector{P} \spc \Delta \dot{\vector{y}}_\textrm{NR} \spc + \spc \dot{\vector{P}} \spc \Delta \vector{y}_\textrm{NR} \quad = \quad & \quad \textbf{A} \spc \vector{P} \spc & \Delta \vector{y}_\textrm{NR} \quad + \quad & \textbf{B} \spc\Delta \vector{u} \\
+\Rightarrow \vector{P} \spc \Delta \dot{\vector{y}}_\textrm{NR} \quad = \quad & \left( \textbf{A} \spc \vector{P} - \dot{\vector{P}} \right) &\Delta \vector{y}_\textrm{NR} \quad + \quad & \textbf{B} \spc\Delta \vector{u} \\
+\Rightarrow \Delta \dot{\vector{y}}_\textrm{NR} \quad = \quad & \vector{P}^{-1} \left( \textbf{A} \spc \vector{P} - \dot{\vector{P}} \right) &\Delta \vector{y}_\textrm{NR} \quad + \quad & \vector{P}^{-1} \spc \textbf{B} \spc\Delta \vector{u}
+\end{align*}
+This equation is of the form 
+\[ \Delta \dot{\vector{y}}_\textrm{NR} \quad = \quad \vector{A}_\textrm{NR} \Delta \vector{y}_\textrm{NR} \quad + \quad \textbf{B}_\textrm{NR} \spc\Delta \vector{u} \]
+Where
+\begin{align}
+\vector{A}_\textrm{NR} \quad = \quad & \vector{P}^{-1} \left( \vector{A} \spc \vector{P} - \dot{\vector{P}} \right) \\
+\vector{B}_\textrm{NR} \quad = \quad & \vector{P}^{-1} \spc \vector{B} 
+\end{align}
+
+The system \textbf{A} and \textbf{B} matrices are obtained at multiple azimuths, converted to the fixed frame and averaged to obtain an engineering representation of a Linear Time-Invariant (\textbf{LTI}) system. The fixed-frame conversion at each azimuth is performed by a modified version of the Heli-UM routine \textbf{linea2}.
+
+\subsubsection*{The Multiblade Coordinate Transformation}
+The system state vector can be partitioned into two sets of vectors: those states defined in the fixed frame, \textbf{y}$_\textrm{NR}$ and the rotor states defined in the rotating frame \textbf{y}$_\textrm{R}$. The rotation matrix that converts the \textit{entire} system state vector \textbf{y} to its fixed-frame counterpart is \textbf{P}, given by 
+\[ \vector{P} = \begin{bmatrix}
+\vector{P}_\textrm{NR} & \vector{0} \\
+\vector{0} & \vector{P}_\textrm{R} \end{bmatrix} \]
+It is assumed that the rotor states constitute the last partition in the state vector. The partition \textbf{P}$_\textrm{NR}$ is an identity matrix whose size is equal to the number of states defined in the non-rotating frame. \textbf{P}$_\textrm{R}$ is the multi-blade transformation matrix. Before writing out an expansion for \textbf{P}$_\textrm{R}$, we recall the partition of state vector corresponding to the rotor modes is given by 
+\[ \vector{y}_\textrm{rotor} \quad = \quad \renewcommand\arraystretch{0.5}\begin{Bmatrix} \spc \dot{\grkvec{\eta}}_1\tr \quad \grkvec{\eta}_{1}\tr \qquad \dot{\grkvec{\eta}}_2\tr \quad \grkvec{\eta}_{2}\tr \quad \cdots \quad \dot{\grkvec{\eta}}_\textrm{Nm}\tr \quad \grkvec{\eta}_\textrm{Nm}\tr \spc  \end{Bmatrix}\tr \] 
+The vector of generalized displacements for the `` $j^\textrm{th}$ '' mode is given by 
+\[ \grkvec{\eta}_j \quad = \quad \renewcommand\arraystretch{0.5}\begin{Bmatrix} \spc  \eta_{j,1} \qquad \eta_{j,2} \quad \cdots \quad \eta_{j,\textrm{Nb}} \spc  \end{Bmatrix}\tr \]
+$\eta_{j,i}$ represents the `` $j^\textrm{th}$ '' generalized displacement of blade `` $i$ ''. These generalized displacements are the coefficients of the normal modes corresponding to the rotating beam structure of the blade. This particular arrangement of the rotor states is useful, since it allows us to construct the partition of the fixed-frame transformation \textbf{P}$_\textrm{R}$ as repeating diagonal blocks, given by 
+\[ \textbf{P}_\textrm{R} \quad = \quad \begin{bmatrix}
+\textbf{P}_\textrm{mode} & \textbf{0} & \cdots & \textbf{0} & \textbf{0} \\
+\textbf{0} & \textbf{P}_\textrm{mode}  & \cdots & \textbf{0} & \textbf{0} \\
+\vdots & \vdots & \ddots & \vdots & \vdots \\
+\textbf{0}& \textbf{0} & \cdots  & \textbf{P}_\textrm{mode}  & \textbf{0} \\
+\textbf{0} & \textbf{0} & \cdots & \textbf{0} & \textbf{P}_\textrm{mode} 
+\end{bmatrix} \]
+The diagonal block \textbf{P}$_\textrm{mode}$ repeats N$_\textrm{m}$ times, where N$_\textrm{m}$ is the number of blade modes. All that remains is to obtain an expression for the matrix \textbf{P}$_\textrm{mode}$, which is a square matrix of size $2\textrm{N}_\textrm{b} \times 2\textrm{N}_\textrm{b}$. 
+
+Consider a mode $\eta$ of a blade contained in a rotor system. $\eta(t)$ is defined in the rotating frame, and the frame is unique to each blade. This mode can be expressed as a Fourier series expansion in azimuth as 
+\[\eta_i(t) \quad = \quad \eta_0(t) \spc + \spc \sum_{k=1}^{N} \left[ \spc \eta_{kc} \spc \cos (k \psi_i) \quad + \quad \eta_{ks} \spc \sin (k \psi_i) \right] \]
+For an even bladed rotor, an additional term exists, corresponding to the differential mode, and the mode is 
+\[\eta_i(t) \quad = \quad \eta_0(t) \spc + \spc \sum_{k=1}^{N} \left[ \spc \eta_{kc} \spc \cos (k \psi_i) \quad + \quad \eta_{ks} \spc \sin (k \psi_i) \spc \right] + \spc \eta_d (-1)^{i-1} \]
+$\eta_0$, $\eta_{kc}$, $\eta_{ks}$ (and $\eta_d$ for even-bladed rotors) are the fixed-frame equivalents of the blade mode $\eta(t)$ for all blades. These transformations from fixed to rotating frame (or vice versa) are exact, hence there are as many fixed-frame coefficients as there are blades. In matrix-vector form, we have
+\begin{equation}
+\grkvec\eta \quad = \quad \vector{T} \spc \grkvec\eta_\textrm{F}
+\end{equation}
+Differentiate once with respect to time to obtain
+\[ \dot{\grkvec\eta} \quad = \quad \dot{\vector{T}} \spc \grkvec\eta_\textrm{F} \spc + \spc \vector{T} \spc \dot{\grkvec\eta}_\textrm{F} \]
+In matrix-vector product form, 
+\begin{equation*}
+\begin{Bmatrix} \dot{\grkvec\eta} \\ \grkvec\eta \end{Bmatrix} \quad = \quad \begin{bmatrix}
+\vector{T} & \dot{\vector{T}} \\
+\vector{0} & \vector{T}
+\end{bmatrix} \begin{Bmatrix} \dot{\grkvec\eta}_\textrm{F} \\ \grkvec\eta_\textrm{F} \end{Bmatrix}
+\end{equation*}
+Where 
+\begin{equation}
+\grkvec\eta_\textrm{F} \quad = \quad \begin{Bmatrix} \eta_0 \\ \eta_\textrm{1c} \\ \eta_\textrm{1s} \\ \vdots \\ \eta_d \end{Bmatrix}
+\end{equation}
+\begin{equation}
+\grkvec\eta \quad = \quad \begin{Bmatrix} \eta_1 \\ \eta_2 \\ \vdots \\ \eta_{\textrm{N}_b}\end{Bmatrix}
+\end{equation}
+For an even bladed rotor, the transformation between rotating blade modes and their fixed-frame counterparts is 
+\begin{equation}
+\vector{T}_\textrm{even} \quad = \quad \begin{bmatrix} 
+1 & \cos \psi_1 & \sin \psi_1 & \cdots & -1 \\
+1 & \cos \psi_2 & \sin \psi_2 & \cdots &  1 \\
+\vdots & \vdots & \vdots & \vdots & \vdots \\
+1 & \cos \psi_{\textrm{N}_b} & \sin \psi_{\textrm{N}_b} & \cdots & 1 
+\end{bmatrix}
+\end{equation}
+For an odd-bladed rotor, the corresponding transformation between rotating blade modes and their fixed-frame counterparts is 
+\begin{equation}
+\vector{T}_\textrm{odd} \quad = \quad \begin{bmatrix} 
+1 & \cos \psi_1 & \sin \psi_1 & \cdots \\
+1 & \cos \psi_2 & \sin \psi_2 & \cdots \\
+\vdots & \vdots & \vdots & \vdots \\
+1 & \cos \psi_{\textrm{N}_b} & \sin \psi_{\textrm{N}_b} & \cdots 
+\end{bmatrix}
+\end{equation}
+\subsection{LQR and the Riccati Equation}
+Feedback control inputs based on linearized models are used in the present analysis to track prescribed vehicle motions and obtain the control inputs required to fly a certain trajectory. To obtain the feedback gains \textbf{K} from the linearized dynamics, the Linear Quadratic Regulator (LQR)  (Ref. \cite{Kirk}) is used, which provides a methodology to stabilize and control a linear system by minimizing a designer-weighted quadratic cost functional in the state deviations from targets and the control inputs. For an LTI system with dynamics given by Eq. (\ref{eqn:lindyn}), the infinite-horizon continuous-time LQR controller yields state feedback gains \textbf{K} to minimize the quadratic cost functional
+\begin{equation}
+\label{eqn:quadcost}
+J \quad = \quad \int_{0}^{\infty} \left(\textrm{ } \vector{x}^T \textrm{ } \textbf{Q} \textrm{ } \vector{x} \textrm{ } + \textrm{ } \Delta \vector{u}^T \textrm{ } \textbf{R} \textrm{ } \Delta \vector{u}\textrm{ } \right) dt
+\end{equation}
+Where
+\[ \vector{x} \quad = \quad ( \textrm{ } \vector{y} \textrm{ } - \textrm{ } \vector{y}_\textrm{target} \textrm{ } ) \]
+The state feedback controls are given by 
+\begin{equation*}
+\Delta \vector{u} \quad = -\textbf{K} \textrm{ } \vector{x} 
+\end{equation*}
+The feedback gains are obtained from
+\begin{equation}
+\label{eqn:LQRfeedback}
+\textbf{K} \quad = \quad \textbf{R}^{-1} \textbf{B}^T \textbf{P} 
+\end{equation}
+\textbf{P} is the unique positive definite steady-state solution of the continuous-time Riccati Equation 
+\begin{equation}
+\label{eqn:Riccati}
+\frac{d \textbf{P}}{dt} \textrm{ } + \textrm{ } \textbf{A}^T \textbf{P} \textrm{ } + \textrm{ } \textbf{P} \textbf{A} \textrm{ } - \textrm{ } \textbf{P} \textbf{B}\textbf{R}^{-1}\textbf{B}^T \textbf{P} \textrm{ } + \textrm{ } \textbf{Q} \quad = \quad \textbf{0}
+\end{equation}
+At steady-state, the time derivatives vanish, and the stabilizing solution satisfies the algebraic Riccati equation
+\begin{equation}
+\label{eqn:SSR1}
+\textbf{A}^T \textbf{P} \textrm{ }+\textrm{ } \textbf{P} \textbf{A} \textrm{ }-\textrm{ } \textbf{P} \textbf{B} \textbf{R}^{-1} \textbf{B}^T \textbf{P} \textrm{ }+ \textrm{ }\textbf{Q} \quad = \quad \textbf{0}
+\end{equation}
+Taking transpose on both sides
+\begin{equation*}
+\textbf{A}^T \textbf{P}^T \textrm{ }+ \textrm{ }\textbf{P}^T \textbf{A} \textrm{ }- \textrm{ }\textbf{P}^T \textbf{B}{\textbf{R}^{-1}}^T\textbf{B}^T \textbf{P}^T \textrm{ }+ \textrm{ }\textbf{Q}^T \quad = \quad \textbf{0}
+\end{equation*}
+The vehicle and load rigid-body states are assigned non-zero weights, and the control inputs are penalized with a unit weight. All other states and off-diagonal weights (entries of \textbf{Q},\textbf{R}) are assigned to zero. The diagonal form of the weighting matrices for controls and states allows for further simplification of the solution procedure to obtain the feedback gains \textbf{K} from the Riccati equation. The steady-state equation simplifies to
+\begin{equation}
+\label{eqn:SSR2}
+\textbf{A}^T \textbf{P}^T \textrm{ }+ \textrm{ }\textbf{P}^T \textbf{A} \textrm{ }- \textrm{ }\textbf{P}^T \textbf{B}{\textbf{R}^{-1}}\textbf{B}^T \textbf{P}^T \textrm{ }+ \textrm{ }\textbf{Q} \quad =\quad \textbf{0}
+\end{equation}
+Eq. (\ref{eqn:SSR2}) is very similar to Eq. (\ref{eqn:SSR1}), with \textbf{P} replaced by $\textbf{P}^T$. Thus, if \textbf{P} is a stabilizing solution, \textbf{P}$^T$ is also a stabilizing solution and if a unique stabilizing solution exists, the matrix \textbf{P} must be symmetric. For a matrix of size \emph{n}$\times$\emph{n}, the number of elements of \textbf{P} to find are ${\frac{n \left(n+1\right)}{2}}$. Thus, Eq. (\ref{eqn:Riccati}) can be integrated numerically from an initial condition towards the stabilizing solution by exploiting symmetry and updating the upper or lower-triangular elements of \textbf{P}.
+
+\subsection{Practical Considerations}
+\begin{itemize}
+\item \textbf{Controllability} \\
+A few candidate flight conditions (straight and turning flight at various speeds) were considered to determine whether the system is controllable, which is a necessary condition for a stabilizing solution of the Riccati equation to exist. In all cases, the Grammian was found to be full-rank. 
+\item \textbf{Solving the Riccati Equation} \\
+A Runge-Kutta (fourth-order) scheme is used to advance the Riccati equation forward in time starting from \textbf{0}. For computational efficiency, the time step is increased as the infinity-norm of $\dot{\textbf{P}}$ decreases, and marching is terminated when it falls below a threshold value ($10^{-8}$)
+\item \textbf{Computation efficiency} \\
+Additional time savings are obtained by marching the Riccati equation forward from the previous steady-state solution instead of the original initial condition (\textbf{0}). In case the Riccati equation does not converge to a steady-state solution within a prefixed number of iterations (30000 in this case), the feedback gains from the previous update are used and the initial condition is reset to \textbf{0}.
+\item \textbf{Gain Scheduling and Control Smoothness} \\
+It is possible, but practically cumbersome, to generate feedback gain matrices for a combination of speeds, climb angles, turn rates and altitudes. Every additional parameter (e.g. fin pitch settings) increases the number of potential pre-computations exponentially. Instead, a dynamic update of the system \textbf{A} and \textbf{B} matrices is performed every 30 revolutions following a re-trim based on the current flight condition and altitude, and the feedback gains \textbf{K} are smoothly transitioned from the previous set to the current one over a few rotor revolutions to avoid abrupt changes in the control inputs.
+\end{itemize}
+
+\begin{Figure}
+ \centering
+ \includegraphics[width=1.3\textwidth, angle=90]{images/feedback_gains_callgraph.png}
+ \vspace{-0.5cm}
+ \captionof{figure}{Abbreviated call graph to perform linearized analysis}
+ \label{fig:cg}
+\end{Figure}

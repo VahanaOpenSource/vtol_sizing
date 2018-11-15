@@ -1,0 +1,79 @@
+Aircraft Weight (x=fixed)            tech 
+                       lb      %DGW factor
+DESIGN GROSS WEIGHT  14230.3              
+Struct Design GW     14230.3  100.0       
+Weight Max Takeoff   13142.5   92.4       
+WEIGHT EMPTY          9252.6   65.0       
+ STRUCTURE            3217.7   22.6       
+  rotor group         1097.5    7.7       
+   blade assembly      690.5    4.9  1.000
+   hub & hinge         407.0    2.9       
+    basic              407.0    2.9  1.000
+  empennage group      184.1    1.3       
+   horizontal tail      63.0    0.4       
+    basic               63.0    0.4  1.000
+   vertical tail        43.9    0.3       
+    basic               43.9    0.3  1.000
+   tail rotor           77.3    0.5  1.000
+  fuselage group      1303.6    9.2       
+   basic              1229.8    8.6  1.000
+   crashworthiness      73.8    0.5  1.000
+  alighting gear       461.1    3.2       
+   basic               400.9    2.8  1.000
+   crashworthiness      60.1    0.4  1.000
+  engine sect/nac      140.2    1.0       
+   engine support       38.1    0.3  1.000
+   engine cowling      102.0    0.7  1.000
+  air induction         31.2    0.2  1.000
+ PROPULSION GROUP     2690.7   18.9       
+  engine system        866.9    6.1       
+   engine              576.0    4.0  1.000
+   exhaust system      192.0    1.3  1.000
+   accessories          98.9    0.7  1.000
+  fuel system          508.1    3.6       
+   tanks and supp      266.6    1.9  1.000
+   plumbing            241.5    1.7  1.000
+  drive system        1315.7    9.2       
+   gear boxes         1085.1    7.6  1.000
+   trans drive          80.5    0.6  1.000
+   rotor shaft         120.6    0.8  1.000
+   rotor brake          29.5    0.2  1.000
+ SYSTEMS AND EQUIP    3112.9   21.9       
+  flight controls      968.7    6.8       
+   cockpit controls    100.0x   0.7       
+   auto flight cont    100.0x   0.7       
+   system controls     768.7    5.4       
+    fixed wing sys      30.4    0.2       
+     non-boosted         4.6    0.0  1.000
+     boost mech         25.8    0.2  1.000
+    rotary wing sys    738.3    5.2       
+     non-boosted       274.8    1.9  1.000
+     boost mech        219.8    1.5  1.000
+     boosted           243.7    1.7  1.000
+  auxiliary power      200.0x   1.4       
+  instruments group    200.0x   1.4       
+  hydraulic group      149.1    1.0       
+   fixed wing            2.6    0.0  1.000
+   rotary wing         146.5    1.0  1.000
+  electrical group     447.0    3.1       
+   aircraft            400.0x   2.8       
+   anti-icing           47.0    0.3  1.000
+  avionics (MEQ)       400.0x   2.8       
+  furnish & equip      600.0x   4.2       
+  environ control      100.0x   0.7       
+  anti-icing group      48.1    0.3  1.000
+ VIBRATION             231.3    1.6       
+ FIXED USEFUL LOAD     775.0    5.4       
+  crew                 600.0x   4.2       
+  fluids                75.0x   0.5       
+  other fixed UL       100.0x   0.7       
+OPERATING WEIGHT     10027.6   70.5       
+scaled operating wt   7152.6   50.3       
+fixed operating wt    2875.0   20.2       
+core vehicle weight   7994.1   56.2       
+WEIGHT EMPTY          9252.6   65.0       
+Fixed UL for DGW       775.5    5.4       
+Fuel for DGW          1702.3   12.0       
+Payload for DGW       2500.0   17.6       
+USEFUL LOAD for DGW   4977.7   35.0       
+DESIGN GROSS WEIGHT  14230.3              

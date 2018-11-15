@@ -1,0 +1,10 @@
+*.dat
+/qbt_bell/
+/smr_bell/
+/unused/
+/coax_test/
+/smr_test/
+/tiltrotor_test/
+/qbt_test/
+/qbt2/
+/qbt_single/

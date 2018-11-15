@@ -1,0 +1,53 @@
+Sizing:
+   mach: 0.4
+
+Empirical:
+   powerHoverAccs : 0.01 # percent of total power for accessories
+   reserveFuelTime: 0.5  # reserve fuel in hours
+   powerAuxEquip  : 30.0  # generator, fan, pumps..  (kW)
+   powerLossMGB   : 0.04 # percent loss
+   xmsnEff        : 0.98 # transmission efficiency
+   effHoverPower  : 0.98 # hover power efficiencies
+   
+   fracInstall    : 1.05  # installation losses
+   
+   # power lapse rates with altitude
+   KD_mrp: 1.1132
+   KD_irp: 1.1379
+   KD_mcp: 1.1000
+
+   # power lapse rates with temperature
+   KT_mrp: 2.1445
+   KT_irp: 2.2248
+   KT_mcp: 2.2407
+
+   # fraction of installed power for hover, mcp, etc.
+   fracPowerIdle: 0.2
+   fracPowerIRP : 0.932
+   fracPowerMCP : 0.85
+
+Aircraft:
+
+   # rotor parameters
+   hover_dwld_factor: 0.05
+   cd0:               0.01
+   tip_mach_max:      0.9
+   FM:                0.72
+
+   # wing parameters
+   oswald:            0.8
+
+   # propeller parameters
+   eff_propeller:     0.84
+   flat_plate_factor: 5
+
+   # engine parameters
+   loss_filter:       0.04
+
+   # miscellaneous parameters
+   fuselage_width:    6
+   clearance:         1
+   
+
+Paths:
+   prasadum: '/home/bharath/research/prasadum/'

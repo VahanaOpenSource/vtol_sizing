@@ -1,0 +1,73 @@
+Sizing:
+   disk_loading:       [9.7] # lb/sq.ft
+   number_blades:      [2]  
+   tip_speed:          [245] #m/s
+   wing_aspect_ratio:  [12] 
+   wing_cl:            [0.2]
+   wing_lift_fraction: [1.0]
+   rotor_solidity:     [0.08,0.09,0.1]
+   fl_freq:            [1.05]
+   cruise_RPM_ratio:   [0.5]           #[0.2,0.25,0.3,0.35]
+
+#fidelity options for weight and performance models
+   ifea:               0
+   iblade:             0
+   icomprehensive:     0
+   use_bemt:           False
+
+# note: 4k95 = 1219.2 m, ISA + 27.92 C, 6k59 = 1828.8 m, ISA + 11.88 C
+# flight mode: 0-idle, 1-hover, 3-cruise
+Mission:
+   nsegments:          2
+   flight_mode:        [      1,       3,     3,    3]
+   condition:          [   'f2',    'f2',  'f2', 'f2'] # this condition over-rides any other input
+   time_seg:           [      5,     101, 420.0,   60] # minutes
+   start_altitude:     [  500.0,  1000.0, 328.1,  0.0] # m
+   end_altitude:       [  500.0,  1000.0, 328.1,  0.0] # m
+   delta_temp_isa:     [    5.9,     0.0,   0.0,  0.0] # centrigrade
+   rate_of_climb:      [      0,       0,     0,    0] # m/min
+   cruise_speed:       [      0,     120,   120,  230] # knots
+   add_payload:        [      0,       0, -22.7,    0] # jettison/pick up additional payload at end of segment
+   distance:           [      0,       0,     0,    0] # km
+
+Aircraft:
+   aircraftID: 1
+   # 1: SMR, 3: Coax, 4: Quadrotor (needs to be improved), 5: QBP
+
+   # payload and crew (kg)
+   mass_payload:      200.0
+   mass_crew:         0 
+   mass_common_equip: 0.0
+   
+   # rotor parameters
+   nrotor:            1
+   overlapping:       [0]
+   rotor_offset:      0
+   rotor_shaft_tilt:  0
+
+   # wing parameters
+   nwing:             0
+   wing_offset:       -1.0
+
+   # propeller parameters
+   npropeller:        0
+
+   # engine parameters
+   nengine:           1
+   engineID:          1
+   engineType:       'turboshaft' 
+
+
+Paths:
+   prasadum: '/Users/bharath/research/prasadum/'
+
+
+
+
+
+# -------------------------------------------------------------------
+# NOTES
+# -------------------------------------------------------------------
+
+# - Sizing inputs can have either [blade_aspect_ratio OR rotor_solidity],
+#   [disk_loading OR rotor_radius] as inputs, but NOT both

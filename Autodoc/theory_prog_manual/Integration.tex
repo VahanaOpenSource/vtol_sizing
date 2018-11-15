@@ -1,0 +1,15 @@
+\section{Time Integration}
+A maneuver is a general unsteady flight condition which includes both trimmed flight and accelerating motions. While it is computationally more expensive to simulate compared to trim, the nature of the present formulation renders it extremely straightforward to implement. Recall that the dynamics formulation resembles 
+\[ \textbf{f}(\vector{y}\textrm{ , }\dot{\vector{y}}\textrm{ , }\vector{u}\textrm{ , }t)
+\quad = \quad \grkvec{\epsilon} \quad = \quad \vector{0} \]
+
+Using an ODE solver (Ref. \cite{Petzold}), the values of $\vector{y}$ and $\dot{\vector{y}}$ are adjusted automatically at each time step by the solver (internally using polynomial interpolation up to order 5) until the relative and absolute errors fall below a user-specified threshold $\delta_\textrm{ODE}$. Reducing this threshold, i.e. enforcing more precision increases the computational effort, but does not significantly affect the accuracy of the solutions beyond a certain numerical value of $\delta_\textrm{ODE}$. For cases investigated so far, the point of diminishing returns is typically $\delta_\textrm{ODE}$ =  10$^{-6}$. The version of DASSL used requires a function argument without derived types, since it is written in Fortran 77. An adapter routine \textbf{ODE\_Bridge} converts the state vectors provided by DASSL into the derived types needed for \textbf{ODEResiduals}. 
+
+Integration can be performed either with user-prescribed controls (subroutine \textbf{read\_con}), fixed controls or a pseudo-flight control system to maintain trim for propulsive trim. Integration is performed for a specified number of rotor revolutions until convergence is achieved. The advantage of this technique is that it makes no assumptions on the time resolution of rotor motions, especially blade accelerations. 
+\begin{Figure}
+ \centering
+ \includegraphics[width=1.3\textwidth, angle=90]{images/time_march_callgraph.png}
+ \vspace{-0.5cm}
+ \captionof{figure}{Call graph to perform time marching}
+ \label{fig:cg}
+\end{Figure}

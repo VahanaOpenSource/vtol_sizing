@@ -1,0 +1,39 @@
+# nnodes, nelem
+2 1
+# node positions
+0.0 0.0 0.0
+1.0 0.0 0.0
+# elem connectivity
+1 2 
+# force boundary condition (nforce \\ nodeid fx fy fz)
+1
+2 0.0 100.0 0.0
+# moment boundary condition (nmoment \\ nodeid mx my mz)
+0
+# displacement boundary condition (ndisp \\ nodeid u v w thx thy thz)
+1
+1 0.0 0.0 0.0 0.0 0.0 0.0
+# element properties
+68.9d4    # 1 - elastic modulus
+0.33d0    # 2 - poissons ratio
+1.d0      # 3 - density of material
+5.7e-4    # 4 - cross-sectional area
+2.2973e-7 # 5 - Iy
+2.2973e-7 # 6 - Iz
+4.5946e-7 # 7 - J (polar moment)
+2.d0      # 8 - ky (shear factor) 
+2.d0      # 9 - kz (shear factor)
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,1493 @@
+\section{Coupled Rotor-Body Dynamics: Derivation}
+While the next step in the code deals with preprocessing operations and those routines should be (traditionally) described here, one of the key steps is modal reduction, which requires an understanding of beam dynamics. Thus, the beam theory and formulation of governing equations is inserted here (along with descriptions of relevant subroutines), following which the code manual will resume.
+
+\subsection{\textbf{Organization}} 
+Except for the free-vortex wake model, the equations of motion governing the system dynamics are formulated in state-space form as a system of first-order nonlinear coupled ODEs of the form
+\[ \textbf{f}(\vector{y}\textrm{ , }\dot{\vector{y}}\textrm{ , }\vector{u}\textrm{ , }t)
+\quad = \quad \grkvec{\epsilon} \quad = \quad \vector{0} \]
+$\vector{y}$ is a vector of system states, $\vector{u}$ is a vector of control inputs and $t$ is the current time in seconds. Numerical solutions of these equations with optional simplifications (e.g. zero body-axis accelerations for trim) can be used to study vehicle performance in steady flight, perform stability analysis and simulate unsteady maneuvers. The subroutine that computes the values of $\grkvec{\epsilon}$ is \textbf{ODEResiduals}, in the folder \textbf{HeliSrc}. The call graph of the subroutine and its various dependencies are shown below. 
+\begin{Figure}
+ \centering
+ \includegraphics[width=1.5\textwidth, angle=90]{images/ODEResiduals_callgraph.png}
+ \vspace{-0.5cm}
+ \captionof{figure}{Call graph to compute ODE residuals and all loads}
+ \label{fig:cg}
+\end{Figure}
+
+The state vector consists of the following components
+\begin{equation}
+\vector{y} \quad = \quad \renewcommand\arraystretch{0.5} \begin{Bmatrix} \spc  \vector{y}\ud{F}\tr \quad & \vector{y}_{\lambda}\tr \quad &  \vector{y}_\textrm{rotor}\tr \quad  \spc  \end{Bmatrix}\tr
+\end{equation}
+\begin{itemize}
+\item $\vector{y}\ud{F}$ represents the vector of the 12 airframe rigid-body states
+\item $\vector{y}_\lambda$ represents the induced inflow coefficients for all rotors. 
+\item $\vector{y}_\textrm{rotor}$ represents the vector of rotor deflection states for all blades.
+\end{itemize}
+The partitioning (and reassembly) of the state and control vectors into (and from) constituent components is performed by \textbf{BreakUpStateVector} and \textbf{ReassembleStateVector} in the folder \textbf{HeliSrc}, which operate on a derived type called \textbf{bigX}. This derived type is contained in the module \textbf{py\_invisible\_globals}.
+The vector of control inputs is 
+\[ \vector{u} \quad = \quad \renewcommand\arraystretch{0.5}\begin{Bmatrix} \qquad \delta_0 \qquad \delta_\textrm{lat} \qquad \delta_\textrm{lon} \qquad \delta_\textrm{ped} \qquad  \end{Bmatrix}\tr \]
+The controls are manipulable by the helicopter pilot and represent, in order, the positions of the collective lever, lateral and longitudinal cyclic stick and the foot pedal. 
+
+Each element in the state vector $\vector{y}$ has a corresponding differential equation in vector $\vector{f}$ of equations used to model the system dynamics. The vector of ODEs can be subdivided into 
+\begin{itemize}
+\item 12 non-linear equations that enforce force and moment equilibrium for the fuselage rigid-body motions, and kinematic compatibility between time derivatives of Euler angles and body-axis angular rates. The corresponding ODE residuals are represented by $\grkvec{\epsilon}\ud{F}$, and the ODEs are given in Eqs. (\ref{eqn:bodyF1}) - (\ref{eqn:bodyM3}) and (\ref{eqn:cgmotion}), Section \ref{sec:rbd}.
+\item 4 dynamic inflow equations for the main and tail rotors,  when using a 3-state Peters-He model to compute the main rotor induced inflow. If the free wake model is used instead of the Peters-He model, then the main rotor dynamic inflow equations are removed from the system and the wake geometry is evolved separately using a time-marching process. The corresponding ODE residuals are $\grkvec{\epsilon}_{\lambda_\textrm{MR}}$ and $\grkvec{\epsilon}_{\lambda_\textrm{TR}}$, given by Eqs. (\ref{eqn:MRDI}) and (\ref{eqn:TRDI}), Section \ref{sec:aerloads}. 
+\item 2 $\times$ $N_b$ $\times$ $N_m$ equations for rotor blade dynamics that represent the mode-weighted Euler-Bernoulli beam equations. The corresponding ODE residuals are $\grkvec{\epsilon}_\textrm{rotor}$, given by Eqs. (\ref{eqn:epsbeam}), Section \ref{sec:modes}.
+\end{itemize}
+The vector of ODE residuals $\grkvec{\epsilon}$ is assembled from the individual components by the routine \textbf{BuildODEResVector}, and is given by 
+\begin{equation}
+\grkvec{\epsilon} \quad = \quad \renewcommand\arraystretch{0.5} \begin{Bmatrix} \qquad \grkvec{\epsilon}\ud{F}\tr \qquad \grkvec{\epsilon}_{\lambda}\tr \qquad  \grkvec{\epsilon}_\textrm{rotor}\tr \qquad \end{Bmatrix}\tr
+\end{equation}
+
+\subsection{\textbf{Coordinate Systems}}
+
+Various reference frames are used in dynamic simulations, depending on the component being analyzed. Earth-fixed axes to track vehicle displacements, body axes for force and moment equilibrium equations, hub-fixed axes for hubloads and rotating axes for blade deflections are some examples. To transfer displacements and loads across various interconnected components, consistency must be maintained, i.e. quantities must be transferred from one axis system to another through coordinate transformations to use in the governing equations for that component. Mathematically, this rotation can be expressed as the pre-multiplication of a vector (X,Y,Z components) with a rotation matrix. One method to perform a rotation from one system to another is to use an Euler angle sequence. The three rotations occur in the following order:
+\begin{itemize}
+\item Yaw angle $\psi$ about the Z axis (the new system is $X_1$,$Y_1$,$Z_1$=Z)
+\item Pitch angle $\theta$ about the $Y_1$ axis (the new system is $X_2$,$Y_2$=$Y_1$,$Z_2$)
+\item Roll angle $\phi$ about the $X_2$ axis (the new system is $X_3$=$X_2$,$Y_3$,$Z_3$)
+\end{itemize}
+The rotations are ``positive" in the anti-clockwise sense. For example, a yaw rotation is positive if the (new) $X_1$ axis lies between the (old) X and Y axes (for a rotation angle less than 90$^\circ$). The rotation matrices for the yaw, pitch and roll rotations are given below.
+\begin{equation*}
+\textbf{T}_\psi \quad = \quad\begin{bmatrix} \cos \psi & \sin \psi & 0 \\ -\sin \psi & \cos \psi & 0 \\ 0 & 0 & 1 \end{bmatrix}
+\end{equation*}
+
+\begin{equation*}
+\textbf{T}_\theta \quad = \quad \begin{bmatrix} \cos \theta & 0 & -\sin \theta \\ 0 & 1 & 0 \\ \sin \theta & 0 & \cos \theta \end{bmatrix}
+\end{equation*}
+
+\begin{equation*}
+\textbf{T}_\phi \quad = \quad \begin{bmatrix} 1 & 0 & 0 \\ 0 & \cos \phi & \sin \phi \\ 0 & -\sin \phi & \cos \phi \end{bmatrix}
+\end{equation*}
+
+Since the sequence occurs in the order $Z \rightarrow Y \rightarrow X$, the rotation matrices must be premultiplied in that order. Thus, the final rotation matrix from co-ordinate system ``G" to ``A"  through angles ($\psi$,$\theta$,$\phi$) is
+\begin{equation*}
+\textbf{T}_{AG} \quad = \quad \textbf{T}_\phi \quad \textbf{T}_\theta \quad \textbf{T}_\psi \quad = \quad \textbf{R}(\psi,\theta,\phi)
+\end{equation*}
+The first subscript on the left hand side is the label of target co-ordinate system \emph{to which} we are converting quantities, and the second subscript is the label of the source co-ordinate system \emph{from which} we are converting quantities. The reverse rotation from co-ordinate system ``A" to ``G" follows the exact opposite sequence in reverse, i.e. angles (-$\phi$,-$\theta$,-$\psi$) about the (X,Y,Z) axes. In that case, the rotation matrix is given by
+\begin{equation*}
+\textbf{T}_{GA} \quad = \quad \textbf{T}_{-\phi} \quad \textbf{T}_{-\theta} \quad \textbf{T}_{-\psi}
+\end{equation*}
+Using trigonometric identities, it can be shown that 
+\begin{eqnarray*}
+\textbf{T}_{-\phi}    \quad = \quad \textbf{T}_\phi\tr \\
+\textbf{T}_{-\theta}  \quad = \quad \textbf{T}_\theta\tr \\
+\textbf{T}_{-\psi}    \quad = \quad \textbf{T}_\psi\tr
+\end{eqnarray*}
+Thus, the rotation from ``A" to ``G" is simplified to
+\begin{equation*}
+\textbf{T}_{GA} \quad = \quad \textbf{T}_{\phi}\tr \quad \textbf{T}_{\theta}\tr \quad \textbf{T}_{\psi}\tr 
+\end{equation*}
+Using the matrix property
+\begin{equation}
+\left( \textbf{A B C} \right)\tr \quad = \quad \textbf{C}\tr \textbf{B}\tr \textbf{A}\tr
+\end{equation}
+\[\textbf{T}_{GA} \quad = \quad (\textbf{T}_\psi \quad \textbf{T}_\theta \quad \textbf{T}_\phi)\tr  \quad = \quad  \textbf{T}_{AG}\tr\]
+These rotation matrices do not depend explicitly on time, and the time derivatives of the forward and backward rotations are also transposes of each other. 
+
+\subsubsection*{Time Derivatives of Rotation Matrices}
+Often, the time derivatives of these rotation matrices are required for transferring displacements and loads across co-ordinate systems. Instead of expanding the matrix multiplication and then differentiating a long expression, it is more elegant to derive expressions for the time derivatives of individual rotations first, and then apply the matrix multiplication to build the total rate of change of a rotation matrix. To that end,
+\begin{align}
+\dot{\textbf{T}}_{AG} & \quad = \quad \frac{d}{dt} \left( \textbf{T}_\phi \quad \textbf{T}_\theta \quad \textbf{T}_\psi \right) \notag \\
+\label{eqn:Td}
+& \quad = \quad \dot{\textbf{T}}_\phi \quad \textbf{T}_\theta \quad \textbf{T}_\psi \quad + \quad \textbf{T}_\phi \quad \dot{\textbf{T}}_\theta \quad \textbf{T}_\psi \quad + \quad \textbf{T}_\phi \quad \textbf{T}_\theta \quad \dot{\textbf{T}}_\psi 
+\end{align}
+The second time derivative is obtained by differentiation
+\begin{align}
+\ddot{\textbf{T}}_{AG} & \quad = \quad \frac{d}{dt} \left(\dot{\textbf{T}}_{AG} \right) \notag \\
+& \quad =  \quad \textrm{  }\textrm{  } \ddot{\textbf{T}}_{\phi} \quad \textbf{T}_\theta \quad \textbf{T}_\psi \quad + \quad \textbf{T}_\phi \quad \ddot{\textbf{T}}_\theta \quad \textbf{T}_\psi \quad + \quad \textbf{T}_\phi \quad \textbf{T}_\theta \quad \ddot{\textbf{T}}_\psi \quad +  \notag \\
+\label{eqn:Tdd}
+&  \quad \qquad 2 \left( \dot{\textbf{T}}_\phi \quad \dot{\textbf{T}}_\theta \quad \textbf{T}_\psi \quad + \quad \dot{\textbf{T}}_\phi \quad \textbf{T}_\theta \quad \dot{\textbf{T}}_\psi \quad + \quad \textbf{T}_\phi \quad \dot{\textbf{T}}_\theta \quad \dot{\textbf{T}}_\psi \right)
+\end{align}
+All that remains is to obtain the time derivatives of the sequential rotations, which are given below.
+\begin{equation*}
+\dot{\textbf{T}}_\psi \quad = \quad \begin{bmatrix} -\sin \psi & \cos \psi & 0 \\ -\cos \psi & -\sin \psi & 0 \\ 0 & 0 & 0 \end{bmatrix} \dot{\psi}
+\end{equation*}
+\begin{equation*}
+\dot{\textbf{T}}_\theta \quad  = \quad  \begin{bmatrix} -\sin \theta & 0 & -\cos \theta \\ 0 & 0 & 0 \\ \cos \theta & 0 & -\sin \theta \end{bmatrix} \dot{\theta}
+\end{equation*}
+\begin{equation*}
+\dot{\textbf{T}}_\phi \quad = \quad \begin{bmatrix} 0 & 0 & 0 \\ 0 & -\sin \phi & \cos \phi \\ 0 & -\cos \phi & -\sin \phi \end{bmatrix} \dot{\phi}
+\end{equation*}
+\begin{equation*}
+\ddot{\textbf{T}}_\psi \quad = \quad \begin{bmatrix} -\sin \psi & \cos \psi & 0 \\ -\cos \psi & -\sin \psi & 0 \\ 0 & 0 & 0 \end{bmatrix} \ddot{\psi} \quad + \quad \begin{bmatrix} -\cos \psi & -\sin \psi & 0 \\ \sin \psi & -\cos \psi & 0 \\ 0 & 0 & 0 \end{bmatrix} \dot{\psi}^2
+\end{equation*}
+\begin{equation*}
+\ddot{\textbf{T}}_\theta \quad  = \quad \begin{bmatrix} -\sin \theta & 0 & -\cos \theta \\ 0 & 0 & 0 \\ \cos \theta & 0 & -\sin \theta \end{bmatrix} \ddot{\theta} \quad + \quad \begin{bmatrix} -\cos \theta & 0 & \sin \theta \\ 0 & 0 & 0 \\-\sin \theta & 0 & -\cos \theta \end{bmatrix} \dot{\theta}^2
+\end{equation*}
+\begin{equation*}
+\ddot{\textbf{T}}_\phi \quad = \quad \begin{bmatrix} 0 & 0 & 0 \\ 0 & -\sin \phi & \cos \phi \\ 0 & -\cos \phi & -\sin \phi \end{bmatrix} \ddot{\phi} \quad + \quad                  \begin{bmatrix} 0 & 0 & 0 \\ 0 & -\cos \phi &-\sin \phi \\ 0 &  \sin \phi & -\cos \phi \end{bmatrix} \dot{\phi}^2
+\end{equation*}
+The rotation matrices and their time derivatives are constructed by the subroutine \textbf{rotmat\_accl} from the Euler angles and their time derivatives.
+
+Various coordinate systems are used in this analysis. Each of these axes systems simplify calculations of certain force and moment components used in the dynamics simulation, and are detailed in the following sections.
+
+\subsubsection{Earth-Fixed Axes}
+\label{sec:efa}
+The earth-fixed axes represent an inertial reference system used to track the motion of objects in space. The origin of this axis system is chosen to be a fixed point on the ground. The unit vector triad along the earth-fixed axes is represented by ($\ihat{i}\ud{G}$, $\ihat{j}\ud{G}$, $\ihat{k}\ud{G}$). The earth-fixed axes are oriented so that $\ihat{i}\ud{G}$ points North, $\ihat{j}\ud{G}$ points East and $\ihat{k}\ud{G}$ points towards the ground. The position vector of the helicopter CG in space is given by 
+\[ \vector{r}\ud{CG} \quad = \quad x\ud{CG} \ihat{i}\ud{G} \quad + \quad y\ud{G} \ihat{j}\ud{G} \quad + \quad z\ud{CG} \ihat{k}\ud{G} \]
+
+\subsubsection{Helicopter Body-Fixed Axes}
+\label{sec:hba}
+The body axes for the helicopter, shown in Fig. \ref{fig:cg}, are obtained from the earth-fixed axes using three translations to shift the origin to the helicopter CG, followed by three Euler rotations $\psi\ud{F}$, $\theta\ud{F}$, $\phi\ud{F}$ in the order Z$\rightarrow$Y$\rightarrow$X, positive for nose-right, pitch-up and roll-right motions respectively. The unit vectors along the body axes are given by
+\begin{equation}
+\pmat{B} \quad = \quad \tee_{BG} \quad \pmat{G}
+\end{equation}
+\linebreak
+\begin{Figure}
+ \centering
+ \includegraphics[width=0.65\linewidth]{./Schematics/Slide2.png}
+ \vspace{-0.5cm}
+ \captionof{figure}{Earth-fixed axes and helicopter body axes}
+ \label{fig:cg}
+\end{Figure}
+\vspace{0.5cm}
+The rotation matrix from gravity to helicopter body axes is given by \\
+\begin{equation}
+\label{eqn:TBG}
+\tee_{BG} \quad = \quad \begin{bmatrix} 1 & 0 & 0 \\ 0 & \spc \cos \phi\ud{F} & \sin \phi\ud{F} \\ 0 & -\sin \phi\ud{F} & \cos \phi\ud{F} \end{bmatrix} \begin{bmatrix} \cos \theta\ud{F} & 0 & -\sin \theta\ud{F} \\ 0 & 1 & 0 \\ \sin \theta\ud{F} & 0 & \spc \cos \theta\ud{F} \end{bmatrix} \begin{bmatrix} \spc \cos \psi\ud{F} & \sin \psi\ud{F} & 0 \\
+-\sin \psi\ud{F} & \cos \psi\ud{F} & 0 \\
+0 & 0 & 1 \end{bmatrix}
+\end{equation}
+\subsubsection{Helicopter Hub Non-Rotating Axes}
+\label{sec:hnra}
+The hub non-rotating axes, shown in Fig. \ref{fig:hub}, are obtained from the helicopter body axes using a translation of the origin, followed by two Euler rotations $\alpha_s$, $\beta_s$ in the order $Y\rightarrow X$, followed by a 180$^\circ$ rotation about the intermediate Y-axis. The first two rotations are positive when the shaft tilt causes the hub to move aft and starboard, respectively. The origin of this axis system is at the center of the hub. The unit vectors along the hub non-rotating axes are 
+\begin{equation}
+\pmat{H} \quad = \quad \tee_{HB} \quad \pmat{B}
+\end{equation}
+\begin{Figure}
+ \centering
+ \includegraphics[width=0.70\linewidth]{./Schematics/Slide3.png}
+ \vspace{-0.5cm}
+ \captionof{figure}{Helicopter hub non-rotating axes}
+ \label{fig:hub}
+\end{Figure}
+\vspace{0.5cm}
+The rotation matrix \emph{from} the helicopter body axes \emph{to} the hub non-rotating axes is 
+\begin{equation}
+\label{eqn:THB}
+\tee_{HB} \quad = \quad \begin{bmatrix} -1 & 0 & 0 \\ 0 & 1 & 0 \\ 0 & 0 & -1 \end{bmatrix} \begin{bmatrix} 1 & 0 & 0 \\ 0 & \cos \beta_s & \sin \beta_s \\ 0 & -\sin \beta_s & \cos \beta_s \end{bmatrix} \begin{bmatrix} \cos \alpha_s & 0 & -\sin \alpha_s \\ 0 & 1 & 0 \\ \sin \alpha_s & 0 & \cos \alpha_s \end{bmatrix}
+\end{equation}
+\subsubsection{Blade Rotating Unpreconed Axes}
+\label{sec:brua}
+The blade rotating unpreconed axes, shown in Fig. \ref{fig:psirotor}, are obtained from the hub non-rotating axes using one rotation $\psi_j$ about the hub non-rotating Z-axis $\ihat{k}\ud{H}$. The origin of the blade rotating unpreconed axes is at the center of the hub, and is coincident with the origin of the hub non-rotating axes. The quantity $\psi_j$ is the azimuth angle of the $j^{th}$ blade, zero when the blade passes over the tail boom, positive counter-clockwise and is given by $\displaystyle{\quad \psi_j \quad = \quad \Omega\ud{MR} t \quad + \quad \frac{2 \pi}{N_b} (j-1)}$. The unit vectors along the blade rotating unpreconed axes are given by
+\begin{equation}
+\pmat{R} \quad = \quad \tee_{RH} \quad \pmat{H}
+\end{equation}
+The rotation matrix \textit{from} the hub non-rotating axes \textit{to} the blade rotating unpreconed axes is
+\begin{equation}
+\label{eqn:TRH}
+\tee_{RH} \quad = \quad \begin{bmatrix} \cos \psi_j & \sin \psi_j & 0 \\ -\sin \psi_j & \cos \psi_j & 0 \\ 0 & 0 & 1 \end{bmatrix}
+\end{equation}
+\begin{Figure}
+ \centering
+ \includegraphics[width=0.6\linewidth]{./Schematics/Slide4.png}
+ \vspace{-0.5cm}
+ \captionof{figure}{Helicopter blade rotating unpreconed axes}
+ \label{fig:psirotor}
+\end{Figure}
+\subsubsection{Blade Preconed Undeformed Axes} 
+\label{sec:bua}
+The blade pre-coned undeformed axes, shown in Fig.\ref{fig:precone} are obtained from the unpreconed axes using one rotation through an angle $-\beta_p$ about the $\ihat{j}\ud{R}$ unpreconed rotating axis, and is positive for vertically upward motion of the blade tip. The origin of the blade preconed axes is coincident with that of the unpreconed axes. 
+\begin{Figure}
+ \centering
+ \includegraphics[width=0.5\linewidth]{./Schematics/Slide5.png}
+ \vspace{-0.5cm}
+ \captionof{figure}{Pre-cone Rotation}
+ \label{fig:precone}
+\end{Figure}
+The unit vectors along the blade rotating unpreconed axes are given by
+\begin{equation}
+\pmat{ } \quad = \quad \tee_{UR} \quad \pmat{R}
+\end{equation}
+The rotation matrix \emph{from} the unpreconed axes \emph{to} the preconed axes is given by 
+\begin{equation}
+\label{eqn:TUR}
+\tee_{UR} \quad = \quad \begin{bmatrix} \cos \beta_p & 0 & \sin \beta_p \\ 0 & 1 & 0 \\ -\sin \beta_p & 0 & \cos \beta_p\end{bmatrix}
+\end{equation}
+\subsubsection{Blade Deformed Axes} 
+\label{sec:bda}
+The blade \emph{deformed} axes are unique to each point on the elastic axis, and are obtained using three translations along the preconed undeformed axes, followed by three consecutive rotations. The first translation is along the $\ihat{i}$ axis through a distance $e + x + u$, where $e$ is the hinge offset, $u$ is the axial fore-shortening due to bending and $x$ is the spanwise position of the beam cross-section. The second translation is along the $\ihat{j}$ axis through the in-plane lead displacement $v$, and the third translation is along the $\ihat{k}$ axis through the out-of-plane flap bending displacement $w$ as shown in Fig. \ref{fig:defbeam}. The origin of the deformed axes defining the orientation of a blade cross-section is at the intersection of the deformed elastic axis with that cross-section. The unit vectors along the deformed axes are
+\begin{equation}
+\label{eqn:TDU1}
+\qmat{\prime} \quad = \quad \tee_{DU} \quad \pmat{}
+\end{equation}
+The transformation matrix \textit{from} the undeformed axes \textit{to} the deformed axes is
+\begin{equation}
+\label{eqn:TDU2}
+\tee_{DU} = \begin{bmatrix}
+c_{\beta_1} c_{\xi_1} & c_{\beta_1} s_{\xi_1} & s_{\beta_1} \\
+-c_{\xi_1} s_{\beta_1} s_{\theta_1} - c_{\theta_1}s_{\xi_1} & c_{\xi_1} c_{\theta_1} - s_{\xi_1} s_{\beta_1} s_{\theta_1} & c_{\beta_1} s_{\theta_1} \\
+-c_{\xi_1} s_{\beta_1} c_{\theta_1} + s_{\theta_1} s_{\xi_1} & -c_{\xi_1} s_{\theta_1} - s_{\xi_1} s_{\beta_1} c_{\theta_1} & c_{\beta_1} c_{\theta_1} \end{bmatrix}
+\end{equation}
+Here, c$_{()}$ = $\cos()$ and s$_{()}$ = $\sin()$. The angles $\xi_1$, $\beta_1$ and $\theta_1$ may be identified from the spatial gradients of the elastic axis deflections and the elastic twist. The $\ihatpr{i}$ axis is tangent to the deformed elastic axis. In accordance with the Euler-Bernoulli hypothesis, plane cross-sections normal to the undeformed elastic axis before beam bending remain plane and normal to the deformed elastic axis after bending. Thus, the cross-section (after bending and twist), is completely contained in the $\ihatpr{j}- \ihatpr{k}$ plane. 
+\begin{Figure}
+ \centering
+ \includegraphics[width=0.75\linewidth]{Schematics/Slide6.png}
+ \vspace{-0.5cm}
+ \captionof{figure}{Undeformed and Deformed Axes}
+ \label{fig:defbeam}
+\end{Figure}
+
+\subsection{\textbf{Helicopter Rigid Body Dynamics}}
+\label{sec:rbd}
+The helicopter fuselage is assumed to be rigid, and the inertial loads can be computed from the body-axis components of the airframe linear and angular velocities. These components are obtained from the partition of the system state vector that contains the fuselage states, given by 
+\[\vector{y}\ud{F} \quad = \quad \renewcommand\arraystretch{0.5}\begin{Bmatrix}\spc  u\ud{F} & v\ud{F} & w\ud{F} \quad & p\ud{F} & q\ud{F} & r\ud{F} \quad & \phi\ud{F} & \theta\ud{F} & \psi\ud{F} \quad & \textrm{x}\ud{CG} \quad \textrm{y}\ud{CG} \quad \textrm{z}\ud{CG} \spc  \end{Bmatrix}\tr \]
+The terms (x$\ud{CG}$, y$\ud{CG}$, z$\ud{CG}$) represent the positions of the helicopter CG in earth-fixed axes, ($u\ud{F}$, $v\ud{F}$, $w\ud{F}$, $p\ud{F}$, $q\ud{F}$, $r\ud{F}$) are the components of linear and angular velocity of the helicopter CG along and about body-fixed axes and ($\psi\ud{F}$, $\theta\ud{F}$, $\phi\ud{F}$) are the Euler angles used in the Z$\rightarrow$Y$\rightarrow$X sequence to define the fuselage orientation with respect to earth-fixed axes. 
+
+Since the fuselage is rigid, the position and orientation of the lifting surfaces (main rotor, tail rotor, horizontal and vertical stabilizers) and cable attachment point remain constant as measured along body-fixed axes. Further, the moments of inertia of a rigid object remain constant when measured about body-fixed axes. Therefore, it is convenient to formulate force and moment equilibrium equations along the fuselage body axes. The force equilibrium equations are 
+%\begin{equation}
+%\begin{aligned}
+%\vector{F} \quad = \quad & \textrm{m} \quad \vector{a} \\
+%\vector{M} \quad = \quad & \textbf{I} \quad  \dot{\grkvec{\omega}} \quad + \quad \grkvec{\omega} \spc  \times \spc \textbf{I} \quad  \grkvec{\omega}
+%\end{aligned}
+%\end{equation}
+\begin{align}
+\label{eqn:bodyF1}
+X \quad = \quad &\textrm{m}\ud{F} (\dot{u}\ud{F} + q\ud{F} w\ud{F} - r\ud{F} v\ud{F} + g \sin \theta\ud{F}) \\
+\label{eqn:bodyF2}
+Y \quad = \quad &\textrm{m}\ud{F} (\dot{v}\ud{F} + r\ud{F} u\ud{F} - p\ud{F} w\ud{F} - g \sin \phi\ud{F} \cos \theta\ud{F}) \\
+\label{eqn:bodyF3}
+Z \quad = \quad &\textrm{m}\ud{F} (\dot{w}\ud{F} + p\ud{F} v\ud{F} - q\ud{F} u\ud{F} - g \cos \phi\ud{F} \cos \theta\ud{F}) 
+\end{align}
+Here, $p\ud{F}$, $q\ud{F}$ and $r\ud{F}$ represent the angular velocity components about the body axes, and can be expressed in terms of the Euler angles ($\phi\ud{F}$, $\theta\ud{F}$, $\psi\ud{F}$) and their time derivatives as 
+\begin{align}
+\label{eqn:pqrf}
+p\ud{F} \quad = \quad &\dot{\phi\ud{F}} \qquad \quad - \quad \dot{\psi\ud{F}} \sin \theta\ud{F} \\
+q\ud{F} \quad = \quad &\dot{\theta\ud{F}} \cos \phi\ud{F} \quad + \quad \dot{\psi}\ud{F} \cos \theta\ud{F} \sin \phi\ud{F} \\
+r\ud{F} \quad = -&\dot{\theta}\ud{F} \sin \phi\ud{F} \quad + \quad \dot{\psi}\ud{F} \cos \theta\ud{F} \cos \phi\ud{F} 
+\end{align}
+The moment equilibrium equations are
+\begin{align}
+\label{eqn:bodyM1}
+L \quad = \quad &I_{xx} \dot{p}\ud{F} - I_{xy} (\dot{q}\ud{F} - p\ud{F} r\ud{F}) - I_{xz} (\dot{r}\ud{F} + p\ud{F} q\ud{F}) - I_{yz} (q\ud{F}^2 - r\ud{F}^2) - (I_{yy} - I_{zz}) q\ud{F} r\ud{F} \\
+\label{eqn:bodyM2}
+M \quad = \quad &I_{yy} \dot{q}\ud{F} - I_{yz} (\dot{r}\ud{F} - q\ud{F} p\ud{F}) - I_{yx} (\dot{p}\ud{F} + q\ud{F} r\ud{F}) - I_{zx} (r\ud{F}^2 - p\ud{F}^2) - (I_{zz} - I_{xx}) r\ud{F} p\ud{F} \\
+\label{eqn:bodyM3}
+N \quad = \quad &I_{zz} \dot{r}\ud{F} - I_{zx} (\dot{p}\ud{F} - r\ud{F} q\ud{F}) - I_{zy} (\dot{q}\ud{F} + r\ud{F} p\ud{F}) - I_{xy} (p\ud{F}^2 - q\ud{F}^2) - (I_{xx} - I_{yy}) p\ud{F} q\ud{F} 
+\end{align}
+The inertial and gravitational loads on the airframe are cumulatively evaluated in the subroutine \textbf{airframe\_inertial\_loads}. Since the positions of the helicopter CG are tracked with respect to the earth, the components of this position vector are assigned as states x$\ud{CG}$, y$\ud{CG}$, z$\ud{CG}$. The corresponding ODEs are given by 
+\begin{equation}
+\label{eqn:cgmotion}
+\frac{d}{dt} \begin{Bmatrix} \textrm{x}\ud{CG} \\ \textrm{y}\ud{CG} \\ \textrm{z}\ud{CG} \end{Bmatrix} \quad = \quad \tee_{GB} \begin{Bmatrix} u\ud{F} \\ v\ud{F} \\ w\ud{F} \end{Bmatrix}
+\end{equation}
+The terms on the left hand side of Eqs. (\ref{eqn:bodyF1}) -(\ref{eqn:bodyF3}) and (\ref{eqn:bodyM1}) - (\ref{eqn:bodyM3}) ($X$, $Y$, $Z$) and ($L$, $M$, $N$) represent the cumulative forces and moments about the center of gravity, respectively, exerted by airframe aerodynamics (subroutine \textbf{airframe\_aerodynamics}), main rotor loads (subroutine \textbf{RotorDynamics}), tail rotor loads (subroutine \textbf{TR\_forces}) and empennage aerodynamics (subroutine \textbf{empennage\_aerodynamics}), and are given by 
+\begin{align*}
+X \quad = \quad &X\ud{MR} \spc + \spc X\ud{TR} \spc + \spc X\ud{HT} \spc + \spc X\ud{VT} \spc + \spc X\ud{F} \\
+Y \quad = \quad &Y\ud{MR} \spc + \spc Y\ud{TR} \spc + \spc Y\ud{HT} \spc + \spc Y\ud{VT} \spc + \spc Y\ud{F} \\
+Z \quad = \quad &Z\ud{MR} \spc + \spc Z\ud{TR} \spc + \spc Z\ud{HT} \spc + \spc Z\ud{VT} \spc + \spc Z\ud{F} \\
+L \quad = \quad &L\ud{MR} \spc + \spc L\ud{TR} \spc + \spc L\ud{HT} \spc + \spc L\ud{VT} \spc + \spc L\ud{F} \\
+M \quad = \quad &M\ud{MR} \spc + \spc M\ud{TR} \spc + \spc M\ud{HT} \spc + \spc M\ud{VT} \spc + \spc M\ud{F} \\
+N \quad = \quad &N\ud{MR} \spc + \spc N\ud{TR} \spc + \spc N\ud{HT} \spc + \spc N\ud{VT} \spc + \spc N\ud{F}
+\end{align*}
+
+The mathematical models for loads generated by each of these components are discussed in the following sections. Sections \ref{sec:hubloads}, \ref{sec:TRloads}, \ref{sec:emploads}, \ref{sec:fusloads} provide details on calculation of force and moment contributions from the main rotor, tail rotor, empennage and fuselage aerodynamics, respectively, to the total loads acting at the vehicle CG. 
+
+\subsubsection{Flexible Test Stand Dynamics}
+Consider a wind-tunnel test, where the rotor may be mounted on a test frame which has its own flexible structural dynamics. The individual structural members may be modeled as beams, bars, plates, shells or brick elements. After assembly, the complete dynamics of the test stand may be expressed as a linear system of the form 
+
+\begin{equation}
+\textbf{M} \ddot{\textbf{x}}_{_\textrm{S}} + \textbf{C} \dot{\textbf{x}}_{_\textrm{S}} + \textbf{K} \textbf{x}_{_\textrm{S}} \quad = \quad \textbf{F}_{_\textrm{S}}
+\end{equation}
+Here, \textbf{x}$_{_\textrm{S}}$ represents the set of test stand degrees of freedom, and \textbf{M}, \textbf{K} and \textbf{C} represent the mass, stiffness and damping matrices of the test stand respectively. \textbf{F}$_{_\textrm{S}}$ represents the forcing vector on each of the hub nodal degrees of freedom. 
+
+These matrices can be condensed to a modal representation as   
+\begin{equation}
+\overline{\textbf{M}} \ddot{\boldsymbol{\eta}}_{_\textrm{S}} + \overline{\textbf{C}} \dot{\boldsymbol{\eta}}_{_\textrm{S}} + \overline{\textbf{K}} \boldsymbol{\eta}_{_\textrm{S}} \quad = \quad \overline{\textbf{F}}_{_\textrm{S}}
+\end{equation}
+
+In modal space, each mode is uncoupled from the other modes. For mass-normalized eigenvectors, the modal equations reduce to 
+\begin{equation}
+\ddot{\eta}_{i_\textrm{S}} + 2\zeta_i \omega_{n_i} \dot{\eta}_{i_\textrm{S}} + \omega_{n_i}^2 \eta_{i_\textrm{S}} \quad = \quad F_{i_\textrm{S}}
+\end{equation}
+
+To simulate the modal equations, the finite element model is assembled and the eigenvalues and mass-normalized eigenvectors are computed. For the test stand, aerodynamic forcing is usually ignored. The primary source of forcing is the rotor hub (i.e. rotor blades). Therefore, the modal forcing F$_{i_\textrm{S}}$ is computed from the dot product of hub forcing with the shape of the eigenvector at the hub node as  
+
+\begin{equation}
+F_{i_\textrm{S}} \quad = \quad X\ud{MR} V_{i_\textrm{X}} \spc + \spc Y\ud{MR} V_{i_\textrm{Y}} \spc + \spc Z\ud{MR} V_{i_\textrm{Z}} \spc + \spc L\ud{MR} V_{i_\textrm{L}} \spc + \spc M\ud{MR} V_{i_\textrm{M}} 
+\end{equation}
+Here, X$\ud{MR}$, Y$\ud{MR}$, Z$\ud{MR}$, L$\ud{MR}$ and M$\ud{MR}$ represent the force and moment components at the rotor hub. The torque at the rotor hub is usually not included because the drivetrain dynamics are usually not included in the test stand model.
+
+\subsubsection{Fuselage Aerodynamics}
+\label{sec:fusloads}
+The aerodynamic forces and moments acting on the body of the fuselage are computed based on the flow velocity components at a ``reference point'' on the fuselage (Ref. \cite{Howlett}), given by 
+\begin{align*}
+u_\textrm{ref} \quad = \quad &u\ud{F} \quad + \quad \textrm{y}_\textrm{ref } r\ud{F} \quad -\quad  \textrm{z}_\textrm{ref } q\ud{F} \quad + u_{\textrm{int}_\textrm{F}} \\
+v_\textrm{ref} \quad = \quad &v\ud{F} \quad + \quad \textrm{z}_\textrm{ref } p\ud{F} \quad -\quad  \textrm{x}_\textrm{ref } r\ud{F} \quad + v_{\textrm{int}_\textrm{F}} \\
+w_\textrm{ref} \quad = \quad &w\ud{F} \quad + \quad \textrm{x}_\textrm{ref } q\ud{F} \quad -\quad  \textrm{y}_\textrm{ref } r\ud{F} \quad + w_{\textrm{int}_\textrm{F}} 
+\end{align*}
+The position vector of the fuselage reference point relative to the vehicle center of gravity is given by 
+\[ \aar_\textrm{ref} \quad = \quad x_\textrm{ref} \spc  \ihat{i}\ud{B} \spc  + \spc  y_\textrm{ref} \spc  \ihat{j}\ud{B} \spc  + \spc  z_\textrm{ref} \spc  \ihat{k}\ud{B} \]
+($u$, $v$, $w$)$_{\textrm{int}_\textrm{F}}$ are interference velocity components along body axes, and are computed from the average main rotor downwash $\lambda_0 \Omega\ud{MR} R$, nose-down tilt of the rotor tip path plane $\beta_{1c}$ and wake skew angle $\chi$ as 
+\begin{equation}
+\begin{aligned}
+u_{\textrm{int}_\textrm{F}} \quad = \quad & \lambda_0 \Omega\ud{MR} R \quad \nu_x(\beta_{1c}, \spc \chi) \\
+v_{\textrm{int}_\textrm{F}} \quad = \quad & 0 \\
+w_{\textrm{int}_\textrm{F}} \quad = \quad & \lambda_0 \Omega\ud{MR} R \quad \nu_z(\beta_{1c}, \spc \chi) 
+\end{aligned}
+\end{equation}
+
+The functions $\nu_x(\beta_{1c}$, $\chi)$ and $\nu_z(\beta_{1c}$, $\chi)$ are obtained from look-up tables, and the wake skew angle is obtained from the free-stream velocity components along shaft axes ($u$, $v$, $w$)$\ud{S}$ as 
+\[ \chi \quad = \quad \tan^{-1} \frac{u\ud{S}}{\lambda \Omega\ud{MR} R - w\ud{S}} \quad + \quad \beta_{1c} \]
+Using the velocity components at the fuselage reference point, the flow incidence angles $\alpha\ud{F}$, $\beta\ud{F}$ are obtained as
+\begin{equation}
+\label{eqn:fusab}
+\begin{aligned}
+\alpha\ud{F} \quad = \quad &\tan^{-1} \frac{w\ud{F}}{u\ud{F}} \\
+\beta\ud{F} \quad  = \quad &\tan^{-1} \frac{v\ud{F}}{\sqrt{u\ud{F}^2 + w\ud{F}^2}} 
+\end{aligned}
+\end{equation}
+$\alpha\ud{F}$ is positive when the fuselage is tilted nose-up with respect to the free-stream flow, and $\beta\ud{F}$ is positive when the starboard side is facing the free-stream flow. Using these two flow angles and the dynamic pressure at the fuselage reference point $q\ud{F}$, the aerodynamic coefficients in the wind-axes system are obtained using a table look-up procedure based on wind-tunnel measurements (Ref. \cite{Howlett}), and transformed to the body axes. Representing the body-axes fuselage forces and moments at the fuselage reference point by $\vector{F}\ud{F}$ and $\vector{M}\ud{F}$ respectively, the loads at the vehicle center of gravity are given by 
+\begin{align*}
+\begin{Bmatrix} X \\ Y \\ Z \end{Bmatrix}\ud{F} \quad = \quad 
+& q\ud{F} \begin{Bmatrix} C_{_X} \\ C_{_Y} \\ C_{_Z} \end{Bmatrix}\ud{F} \\ 
+\begin{Bmatrix} L \\ M \\ N \end{Bmatrix}\ud{F} \quad = \quad 
+& q\ud{F} \begin{Bmatrix} C_{_L} \\ C_{_M} \\ C_{_N} \end{Bmatrix}\ud{F} \quad + \quad \aar_\textrm{ref} \spc \times \spc \vector{F}\ud{F} \\
+\textrm{Where} \qquad \qquad \qquad & \\
+q\ud{F} \quad = \quad & \frac{1}{2} \quad \rho \quad \left(u\ud{F}^2 \quad + \quad v\ud{F}^2 \quad + \quad w\ud{F}^2 \right)
+\end{align*}
+In this version of the code, the interference velocities are neglected. Table look-up is performed in \textbf{airframe\_table\_lookup}.
+
+\subsubsection{Empennage Aerodynamics}
+\label{sec:emploads}
+The aerodynamic loads acting on the horizontal and vertical tail are computed using a procedure similar to that followed for the fuselage. The velocity at the reference point for each lifting surface is computed from the fuselage translation velocity $\vector{V}_b$, angular velocity $\grkvec{\omega}_b$ and the position of the reference points with respect to the vehicle center of gravity $\vector{r}\ud{H}$, $\vector{r}_{_\textrm{V}}$ as
+\begin{equation}
+\begin{aligned}
+\vector{V}\ud{HT} \quad = \quad &K\ud{H} \vector{V}_b \quad + \quad \grkvec{\omega} \spc \times \spc \aar\ud{H} \quad + \quad \vector{V}_{\textrm{int}_\textrm{H}} \\
+\vector{V}\ud{VT} \quad = \quad &K_{_\textrm{V}} \vector{V}_b \quad + \quad \grkvec{\omega} \spc \times \spc \vector{r}_{_\textrm{V}} \quad + \quad \vector{V}_{\textrm{int}_\textrm{V}} \\
+\end{aligned}
+\end{equation}
+$K\ud{H}$ and $K_{_\textrm{V}}$ are used to empirically model the dynamic pressure loss at the tail surfaces, which occurs as a result of operating in the wake of the airframe. $\vector{V}_{\textrm{int}_\textrm{H}}$ and $\vector{V}_{\textrm{int}_\textrm{V}}$ represent the velocities at the tail surfaces induced by the main rotor wake, (obtained from wind-tunnel tests) and are given by 
+\begin{equation}
+\begin{aligned}
+\vector{V}_{\textrm{int}_\textrm{H}} \quad = \quad \lambda_0 \Omega\ud{MR} R \quad  \left[\nu_{x_\textrm{H}} (\beta_{1c},\chi) \spc  \ihat{i}\ud{B} \quad + \quad 
+\nu_{z_\textrm{H}} (\beta_{1c},\chi) \spc  \ihat{k}\ud{B} \right] \\
+\vector{V}_{\textrm{int}_\textrm{V}} \quad = \quad \lambda_0 \Omega\ud{MR} R \quad  \left[\nu_{x_\textrm{V}} (\beta_{1c},\chi) \spc  \ihat{i}\ud{B} \quad + \quad 
+\nu_{z_\textrm{V}} (\beta_{1c},\chi) \spc  \ihat{k}\ud{B} \right]
+\end{aligned}
+\end{equation}
+The functions $\nu_{x_H}$, $\nu_{z_H}$, $\nu_{x_V}$, $\nu_{z_V}$ are obtained from look-up tables based on the wake skew angle $\chi$ and the tip-path plane tilt $\beta_{1c}$ with respect to the fuselage. Using ($u$, $v$, $w$)$\ud{H}$ and ($u$, $v$, $w$)$_{_\textrm{V}}$ to represent the velocity components at the horizontal and vertical stabilizers, respectively, along vehicle body axes, the angles of attack and sideslip at the tail surfaces are computed as 
+\begin{align*}
+\alpha\ud{H} \quad = \quad & \tan^{-1} \frac{w\ud{H}}{u\ud{H}} \quad + \quad \theta\ud{HT} \\
+\beta\ud{H} \quad = \quad & \tan^{-1} \frac{v\ud{H}}{\sqrt{u\ud{H}^2 + w\ud{H}^2}} \\
+\alpha_{_\textrm{V}} \quad = \quad & \tan^{-1} \frac{w_{_\textrm{V}}}{u_{_\textrm{V}}} \quad \\
+\beta_{_\textrm{V}} \quad = \quad & \tan^{-1} \frac{v_{_\textrm{V}}}{\sqrt{u_{_\textrm{V}}^2 + w_{_\textrm{V}}^2}} 
+\end{align*}
+The pitch of the horizontal stabilizer $\theta\ud{HT}$ is scheduled to change with the fuselage speed in a prescribed manner. An approach similar to that followed for the fuselage aerodynamics is utilized for computing the forces on the horizontal and vertical stabilizers. Using the incidence angles $\alpha$ and $\beta$ for each surface and the dynamic pressure at the reference points, the aerodynamic lift and drag coefficients are obtained using a table look-up procedure based on wind-tunnel measurements, and transformed to the helicopter body axes. Using ($\vector{F}\ud{HT}$, $\vector{F}\ud{VT}$) and ($\vector{M}\ud{HT}$, $\vector{M}\ud{HT}$) to represent the body-axes forces and moments, respectively, at the reference points, the loads at the vehicle center of gravity are given by 
+\begin{align*}
+\begin{Bmatrix} X \\ Y \\ Z \end{Bmatrix}_\textrm{emp} \quad = \quad 
+& q\ud{HT} \begin{Bmatrix} C_X \\ C_Y \\ C_Z \end{Bmatrix}\ud{HT} \quad + \quad q\ud{VT} \begin{Bmatrix} C_X \\ C_Y \\ C_{Z} \end{Bmatrix}\ud{VT} \\
+\begin{Bmatrix} L \\ M \\ N \end{Bmatrix}_\textrm{emp} \quad = \quad & \vector{r}\ud{HT} \spc  \times \spc \vector{F}\ud{HT} \quad + \quad \vector{r}\ud{VT} \spc \times \spc \vector{F}\ud{VT} 
+\end{align*}
+The dynamic pressures are given by
+\begin{equation}
+\begin{aligned}
+q\ud{HT} \quad = \quad & \frac{1}{2} \quad \rho \quad \vector{V}\ud{HT} \cdot \vector{V}\ud{HT} \qquad \textrm{and} \qquad 
+q\ud{VT} \quad = \quad \frac{1}{2} \quad \rho \quad \vector{V}\ud{VT} \cdot \vector{V}\ud{VT} \qquad 
+\end{aligned}
+\end{equation}
+Table look-up is performed in the subroutine \textbf{empennage\_table\_lookup}.
+
+\subsubsection{Tail Rotor Aerodynamics}
+\label{sec:TRloads}
+The tail rotor model is based on a simplified implementation of the closed-form solution given by Ref. \cite{Bailey}, which relates the free-stream velocity to the rotor thrust, torque and induced inflow. The velocity at the tail rotor reference point (hub) is 
+\begin{equation}
+\vector{V}\ud{TR} \quad = \quad \vector{V}_b \quad + \quad \grkvec{\omega} \spc  \times \spc \vector{r}\ud{TR} \quad + \quad \vector{V}_{\textrm{int}_\textrm{TR}}
+\end{equation}
+$\vector{V}_{\textrm{int}_\textrm{TR}}$ represents the induced velocity at the tail rotor reference point due by the wake of the main rotor and fuselage, given by  
+\begin{equation}
+\vector{V}_{\textrm{int}_\textrm{TR}} \quad = \quad \lambda_0 \Omega\ud{MR} R \quad  \left[\nu_{x_\textrm{TR}} (\beta_{1c},\chi) \spc  \ihat{i}\ud{B} \quad + \quad 
+\nu_{z_\textrm{TR}} (\beta_{1c},\chi) \spc  \ihat{k}\ud{B} \right] \\
+\end{equation}
+The functions $\nu_{x_\textrm{TR}}$, $\nu_{z_\textrm{TR}}$ are obtained from look-up tables based on the wake skew angle $\chi$ and the tip-path plane tilt $\beta_{1c}$ with respect to the fuselage. The velocity $\vector{V}\ud{TR}$ at the tail rotor reference point  $\vector{r}\ud{TR}$ is resolved into components along the tail rotor axes. The tail rotor axes system are obtained using two rotations in the sequence $Z\rightarrow Y$ through angles ($\Gamma\ud{TR}$, $\Lambda\ud{TR}$) starting from the helicopter body axes. The rotation matrix from fuselage body axes to tail rotor axes is given by 
+\[ \tee_{TR,B} \quad = \quad \begin{bmatrix} \cos \Lambda\ud{TR} & 0 & -\sin \Lambda\ud{TR} \\ 0 & 1 & 0 \\ \sin \Lambda\ud{TR} & 0 & \cos \Lambda\ud{TR} \end{bmatrix} \spc \begin{bmatrix} \cos \Gamma\ud{TR} & \sin \Gamma\ud{TR} & 0 \\ -\sin \Gamma\ud{TR} & \cos \Gamma\ud{TR} & 0 \\ 0 & 0 & 1 \end{bmatrix}  \]
+The velocity components in the tail rotor reference frame are
+\begin{equation}
+\begin{Bmatrix} u \\ v \\ w \end{Bmatrix}\ud{TR} \quad = \quad \tee_{TR,B} \left[ \quad \vector{V}\ud{TR} \cdot \begin{Bmatrix} \ihat{i}\ud{B} \\ \ihat{j}\ud{B} \\ \ihat{k}\ud{B} \end{Bmatrix} \quad \right]
+\end{equation}
+The tail rotor thrust (assumed to act along the shaft direction) is 
+\begin{equation}
+T\ud{TR} \quad = \quad \pi \quad R\ud{TR}^4 \quad \Omega\ud{TR}^2 \quad |V|\ud{TR} \quad v_{i,_\textrm{TR}} \quad K\ud{TR} 
+\end{equation}
+$v_{i,_\textrm{TR}} = \lambda\ud{TR} \Omega\ud{TR} R\ud{TR}$ is the average induced velocity of the tail rotor, $K\ud{TR}$ accounts for blockage effects of the vertical fin and $|V|\ud{TR}$ is the magnitude of the total velocity (including induced inflow) at the tail rotor, given by 
+\[ |V|\ud{TR} \quad = \quad \sqrt{u\ud{TR}^2 \quad + \quad v\ud{TR}^2 \quad + \quad (w\ud{TR}- \lambda\ud{TR} \Omega\ud{TR} R\ud{TR})^2} \]
+The tail rotor torque due to induced and profile drag is 
+\[ Q\ud{TR} \quad = \quad C_{Q_\textrm{TR}} \quad \rho \quad \pi \quad \Omega\ud{TR}^2 \quad R\ud{TR}^5 \]
+The forces and moment components in fuselage body axes exerted by the tail rotor on the airframe center of gravity are obtained using a coordinate transformation 
+\begin{align*}
+\begin{Bmatrix} X \\ Y \\ Z \end{Bmatrix}\ud{TR} \quad = \qquad & \tee_{TR,B}\tr \quad \begin{Bmatrix} 0 \\ -T\ud{TR} \\ 0 \end{Bmatrix}\\
+\begin{Bmatrix} L \\ M \\ N \end{Bmatrix}\ud{TR} \quad = \qquad & \tee_{TR,B}\tr \quad \begin{Bmatrix} 0 \\ -Q\ud{TR} \\ 0 \end{Bmatrix} \\
++ \quad & \vector{r}\ud{TR} \spc \times \spc (X\ud{TR} \spc  \ihat{i}\ud{B} + Y\ud{TR} \spc  \ihat{j}\ud{B} + Z\ud{TR} \spc  \ihat{k}\ud{B})
+\end{align*}
+
+\subsection*{Tail Rotor Dynamic Inflow}
+The induced inflow of the tail rotor is assumed to be uniform over the disk, and is represented using a 1-state Pitt-Peters dynamic inflow model (Ref. \cite{PittPeters}). The ODE governing the inflow dynamics is 
+\begin{equation}
+\label{eqn:TRDI}
+\frac{4 R\ud{TR}}{3 \pi |V\ud{TR}|} \dot{\lambda}\ud{TR} \quad + \quad \lambda\ud{TR} \quad = \quad \frac{C_{T_\textrm{TR}} \Omega\ud{TR} R\ud{TR}}{2 |V\ud{TR}|}
+\end{equation}
+$C_{T_{TR}}$ is the thrust coefficient of the tail rotor. The calculation of tail rotor forces and moments is performed by the subroutine \textbf{tail\_rotor\_forces}, an updated version of a carry-over subroutine from legacy code Heli-UM.
+
+\subsection{\textbf{Main Rotor Aerodynamic Models}}
+\label{sec:aeromodels}
+%The flowfield created by the motions of the airframe and main rotor wake imposes forces and moments on the fuselage, rotor blades, empennage and tail rotor, all of which (at a given flight condition) are used to determine the total forces and moments on the vehicle and individual rotor blades. These loads are used to determine the new helicopter orientation, velocity and rotor wake, thus modifying the flowfield. Since dynamic response and flowfield characteristics are so tightly coupled and inter-related, it is critical to simultaneously utilize models with sufficient and quantitatively comparable fidelity levels for each component to predict the coupled helicopter-rotor-wake response to the required precision. \\
+This section provides a brief description of the rotor inflow models (dynamic inflow and free-vortex wake) used to quantify the induced inflow of the main rotor. Vortex wake models provide a numerical representation of the flowfield through summation of velocities induced by individual vortex filaments. Semi-analytic dynamic inflow models relate the aerodynamic thrust distribution over the rotor disk to the inflow coefficients. When a 3-state dynamic inflow model is used to represent the main rotor flowfield, the inflow state vector is given by 
+\[\vector{y}_\lambda \quad = \quad \renewcommand\arraystretch{0.5}\begin{Bmatrix} \spc  \overline{\lambda}_0 \quad & \overline{\lambda}_\textrm{1c} \quad & \overline{\lambda}_\textrm{1s} \quad & \lambda\ud{TR} \spc  \end{Bmatrix}\tr \]
+$\overline{\lambda}_0$ represents the average induced inflow ratio of the main rotor, scaled by a constant factor $\sqrt{3}$ (Ref. \cite{He1989}) ; $\overline{\lambda}_\textrm{1c}$, $\overline{\lambda}_\textrm{1s}$ are the (scaled) longitudinal and lateral skews of the induced inflow ratio ; and $\lambda_\textrm{TR}$ represents the induced inflow ratio of the tail rotor. 
+
+\subsubsection{Main Rotor Dynamic Inflow}
+The aim of dynamic inflow models is to capture, in an approximate manner, the time-varying inflow distribution on a rotor disk operating in flight conditions that are slowly varying as a function of time. The general form of these models (Refs. \cite{He1989}) consists of two sets of coupled first-order ordinary differential equations, given by 
+\begin{equation}
+\label{eqn:MRDI}
+\begin{aligned}
+\boldsymbol{\tau}_c \quad \dot{\grkvec{\lambda}}_c \quad + \quad \grkvec{\lambda}_c \quad = \quad &\vector{f}_c(\spc C_{\ell}(r,\psi),\spc \cos \psi,\spc \cos 2\psi, \spc \cos 3 \psi, \cdots) \\
+\boldsymbol{\tau}_s \quad \dot{\grkvec{\lambda}}_s \quad + \quad \grkvec{\lambda}_s \quad = \quad &\vector{f}_s(\spc C_{\ell}(r,\psi), \spc \sin \psi\spc , \sin 2\psi\spc , \sin 3 \psi\spc , \cdots)
+\end{aligned}
+\end{equation}
+Here, $r$ represents the non-dimensional radial distance from the shaft, and $\psi$ represents the azimuthal position of a point on the rotor disk. The first set of equations represent the longitudinal inflow dynamics, i.e. variations along the flight direction, including the uniform component. The second set of equations represent the lateral skew in inflow. Dynamic inflow models traditionally focus on rotors in forward flight, which reduce to hover at zero flight speed. A comprehensive summary of these models may be found in Ref. \cite{Chen1}. The subroutine \textbf{inflow\_dynamics} computes the residuals of the dynamic inflow equations, using a heavily modified carry-over routine \textbf{pheqs2} from Heli-UM.
+%Physical interpretations of the terms in these equations are useful in understanding the system dynamics. The uniform coefficient $\lambda_0$ is the average inflow induced over the rotor disk as a result of generating vertical thrust. The harmonic coefficients $\lambda_{1c}$ and $\lambda_{1s}$ capture the azimuthal variation in inflow when operating in forward flight. The time delay terms $\boldsymbol\tau_c$ and $\boldsymbol\tau_s$ can be understood by considering the inflow response to a step change in collective. In the physical system, there is a time lag between a step change in angle of attack and increase of airfoil lift (Ref. \cite{Leishman1}). Another time lag occurs from the physical manifestation of rotor inflow. Following a step change in collective, the strengths of vortices in the rotor wake gradually change, starting from those corresponding to the smallest wake age and then propogating along the trailers as time proceeds. In reality, the ``old'' vortices are convected far away from the rotor and ``new'' vortices (with strengths corresponding to the updated blade lift) assume their locations, and this convection (advection) process occurs over a finite time. In an approximate sense, the coefficients $\grkvec{\tau}$ model the time delay between a change in rotor operating condition (due to blade pitch inputs, flight condition, dynamic response or a combination of these perturbations) and the manifestation of a change in the inflow distribution. The main advantage of these models is the relatively low computational cost required to obtain a solution. However, some assumptions made during the formulation process render the model inaccurate at certain operating conditions (e.g. low-speed cross-couplings are absent). Further, these models need to be ``retro-fitted'' with semi-empirical modifications to be compatible with comprehensive analyses in maneuvering flight, to account for tip path plane reorientation as a function of time. Despite these limitations, these models provide reasonable quantitative representations of the rotor aerodynamics by relating the aerodynamic force distribution over the disk to the inflow coefficients. Further, the representation of rotor aerodynamics in the form of ODEs lends itself to lineraized stability analyses. 
+The uniform inflow $\lambda_0$ and longitudinal skew $\lambda_{1c}$ are coupled to each other, and each is individually uncoupled from the lateral skew component $\lambda_{1s}$. The inflow at a point ($r$, $\psi$) is given by 
+\[ \lambda(r,\psi) \quad = \quad \lambda_0 \quad + \quad r \left(\lambda_{1c} \cos \psi \quad + \quad \lambda_{1c} \sin \psi\right) \]
+$\lambda_0$, $\lambda_\textrm{1c}$ and $\lambda_\textrm{1s}$ are obtained from the inflow states $\overline{\lambda}_0$, $\overline{\lambda}_\textrm{1c}$ and $\overline{\lambda}_\textrm{1s}$ and coefficients of the radial basis functions as given in Ref. \cite{He1989}. 
+
+\subsubsection{Vortex Wake}
+Sometimes, the flight speeds of interest range from hover ($\mu$ = 0) to transition flight conditions ($\mu$ \textless 0.1) where blade-vortex interactions cause significant azimuthal and radial variations in the inflow distribution. Cross-couplings between rotor-airframe lateral and longitudinal modes are introduced by the wake, and these dynamics are not modeled by ``reduced-order'' (in a comparative sense) dynamic inflow equations. To accurately represent the coupled dynamics of helicopter flight and the rotor wake, an in-house free-vortex wake methodology (Refs. \cite{Bhagwat}, \cite{Ananthan}) is used to model the rotor wake. For completeness, a brief summary is presented here, borrowing heavily and paraphrased from detailed descriptions in Ref. \cite{Ananthan}.  
+
+\subsubsection*{Mathematical Model of Vortex Wake}
+
+%A Lagrangian description of the flowfield is used in the prsent work, where the computational domain (blade and rotor wake) is represented using discrete elements of vorticity, while the rest of the flowfield is assumed to be irrotational. These elements of vorticity originate from the rotor blades, and their strengths are computed using the rotor flight conditions and operating angles of attack of the blade airfoil sections. Using mathematical models of velocity induced by a vortex at a point, the velocity induced at individual points on the rotor blades can be computed. The free-vortex wake problem consists of obtaining the motions of the vortex markers (with respect to the rotor blades) under the influence of free-stream flow, self-induced velocities and changes in vorticity of individual elements.
+
+The tip vortex trailed from a rotor blade is naturally curved, but is discretized into multiple straight-line segments. Lagrangian markers are placed at the intersections of these line segments, and the approximate trailer geometry is obtained using a piecewise linear reconstruction as shown in Fig. \ref{fig:MFW_trailers}. This choice of discretization has been shown to be second-order accurate (Refs \cite{Bhagwat}, \cite{Wachspress}, \cite{Gupta}) and that to maintain overall second-order accuracy, the wake discretizations must be less than 5$^\circ$. 
+
+The markers so defined are allowed to convect to force-free locations in space based on the vortex-induced velocities and free-stream conditions. The motion of these particles is governed by the three-dimensional incompressible form of the Navier-Stokes equation written in velocity-vorticity form. For the purposes of convecting vortex particles, viscous effects can be ignored since they are usually confined to much smaller length scales (e.g. airfoil boundary layers). Under inviscid incompressible flow conditions, the problem of tracking the location of vortex markers in space reduces to 
+\[\frac{d \aar_p}{dt} \quad = \quad \vector{V}_i \qquad \qquad \qquad \aar_p(t_0) \quad = \quad \aar_{_0} \]
+Here, $\aar_0$ is the initial position of the marker. For the wake trailed from a helicopter blade rotating at constant angular speed $\Omega\ud{MR}$, the left hand side can be expressed as a function of the blade azimuth $\psi$ and wake age $\zeta$. The convection equation is 
+\[\frac{\partial \vector{r}_p}{\partial \psi} \quad + \quad \frac{\partial \vector{r}_p}{\partial \zeta} \quad = \quad \frac{\vector{V}_i}{\Omega\ud{MR}} \]
+Using five-point central and second-order backward difference representations, respectively, for the spatial and temporal derivatives results in the following approximation
+\[D_{\zeta} \quad + D_{\psi} \quad \approx \quad \frac{1}{\Omega\ud{MR}} \vector{V}_i \]
+\begin{Figure}
+ \centering
+ \includegraphics[width=0.85\linewidth]{./images/MFW_trailers.png}
+ \captionof{figure}{Free-Vortex Wake Model of a Rotor}
+ \label{fig:MFW_trailers}
+\end{Figure}
+%\vspace{0.5cm}
+
+%Where
+%\[D_{\zeta} \quad = \quad \frac{\aar(\psi+\Delta \psi,\zeta+\Delta \zeta) + \aar(\psi,\zeta+\Delta \zeta) - \aar(\psi+\Delta\psi,\zeta) - \aar(\psi,\zeta)}{2 \Delta\zeta} \]
+%\[D_{\psi} \quad = \quad \frac{3\aar(\psi+\Delta \psi,\zeta) - \aar(\psi,\zeta) - 3 \aar(\psi-\Delta \psi,\zeta)+\aar(\psi-2\Delta \psi,\zeta)}{4 \Delta \psi}\]
+
+%\subsubsection*{Induced Velocity at a Point in the Flowfield}
+
+%Wake-induced velocities at points of interest (blade control points and vortex markers) are computed by repeated applications of the Biot-Savart law, and summing the individual contributions from each line vortex present in the flow-field. The velocity induced at a point (P) by a single straight-line vortex ($\vector{AB}$) of constant circulation $\Gamma_\textrm{v}$ is given by 
+%\begin{equation}
+%\label{eqn:VortexIndVel}
+%\textbf{V} \quad = \quad \frac{\Gamma_\textrm{v}}{4 \pi} \left[ \vector{a} \cdot \left(\frac{\aar_1}{|\aar_1|} - \frac{\aar_2}{|\aar_2|} \right) \right] \frac{\vector{a} \spc \times \spc \aar_1}{|\vector{a} \spc \times \spc \aar_1|^2}
+%\end{equation}
+%$\aar_1$ is the position vector from B to P, $\aar_2$ is the position vector from A to P and $\vector{a} = \vector{AB}$, the vector defining the line vortex as shown in Fig. \ref{fig:FWviv}. 
+%Diffusion of vortex filaments is modeled using viscous cores with desingularized velocity profiles. A class of models was proposed by Vatistas (Ref. \cite{Vatistas}) that characterize the tangential velocity profiles in a plane normal to the filament axis as
+%\[V_{\theta}(r) \quad = \quad \frac{\Gamma_\textrm{v}}{2 \pi} \left(\frac{r}{(r^{2n} + r_c^{2n})^{1/n}} \right)\]
+%The value $n$=2 is known to provide a better approximation to experimentally determined velocity profiles (Refs \cite{Vatistas},\cite{Bagai}) and is used in the present work. The growth of the core radius $r_c$ as a function of time is modeled by 
+%\begin{equation}
+%\label{eqn:corerad}
+%r_c(\zeta) \quad = \quad\sqrt{r_{c_0}^2 + \frac{4 \alpha\delta\nu \zeta}{\Omega\ud{MR}} \int_0^\zeta (1+\epsilon)^{-1} d\zeta} 
+%\end{equation}
+
+%\begin{Figure}
+% \centering
+% \includegraphics[width=0.5\linewidth]{./Schematics/Slide11.png}
+% \captionof{figure}{Line Vortex Orientation and Vectors to Target Point}
+% \label{fig:FWviv}
+%\end{Figure}
+%\vspace{0.5cm}
+%$\alpha$,$\zeta_0$ are experimentally determined values and $\delta$ is the apparent average Eddy viscosity coefficient and is a function of the vortex Reynolds number $\Gamma_\textrm{v}$/$\nu$, given by 
+%\[ \delta \quad = \quad 1 + a_1 \frac{\Gamma_\textrm{v}}{\nu} \]
+%$a_1$ is an experimentally determined parameter that, together with the vortex Reynolds number, models the diffusion rate of the vortex core. The integral term under the square root in Eq. (\ref{eqn:corerad}) models corrections to the core radius due to filament stretching effects, and $\epsilon$ represents the strain of the filament.
+
+\subsubsection*{Blade Bound Vortices and Near Wake}
+Each blade is modeled as a distribution of vortex singularities in the flowfield (Refs. \cite{BagaiPHD}, \cite{Bhagwat}, \cite{Ananthan}). To accurately capture spanwise variation of lift and the associated trailed wake strengths, a Weissinger-L lifting surface model is used to represent the \emph{effect of the blade} on the rest of the flowfield. Each blade is divided into multiple spanwise segments, each with a bound line vortex located at quarter-chord as shown in Fig. \ref{fig:MFW_blade}.
+\begin{Figure}
+ \centering
+ \includegraphics[width=0.75\linewidth]{./images/MFW_blade.png}
+ \captionof{figure}{Bound Vortices on a Helicopter Blade}
+ \label{fig:MFW_blade}
+\end{Figure}
+\vspace{0.5cm}
+The strengths of the trailed vortex segments are obtained using Helmholtz's laws of vorticity conservation (Ref. \cite{Saffman}), given by 
+\[ \Gamma_\textrm{t}|_j \quad = \quad \Gamma_\textrm{b}|_j \quad - \quad \Gamma_\textrm{b}|_{j+1} \]
+The so-called ``near wake'' of the rotor blade consists of the  trailed line vortices obtained from the Weissinger-L model. As in Ref. \cite{Ananthan}, the near wake is assumed to be rigid and aligned with the local airfoil chordline. These trailers are truncated after a short distance $\Delta \psi_w = 30^\circ$. It is assumed that at an azimuth $\Delta \psi_w$ behind the rotor blade, the vortex sheet has completely rolled up into free-vortex trailers, or elements of circulation, that comprise the far wake.
+
+The bound circulation strengths $\grkvec{\Gamma}_b$ are obtained by enforcing the flow tangency criterion at the three-quarter chord points (or \emph{control points}) at the mid-span locations of each blade segment. Mathematically, this is achieved by setting to zero the total velocity normal to the airfoil reference line, i.e.
+\[ \vector{V}(i) \cdot \vector{n}(i) \quad = \quad 0 \qquad \qquad i = 1,2,3,...,N\ud{S} \]
+$\vector{V}(i)$ represents the velocity vector and $\vector{n}(i)$ represents the unit vectors normal to the airfoil reference line corresponding to control point $i$. The total velocity $\vector{V}(i)$ can be obtained by summing the contributions from hub translations, hub rotations, free-wake trailers, (rigid) near-wake trailers and bound vortices as 
+\begin{equation}
+\label{eqn:indvelFW}
+\vector{V}(i) \quad = \quad \vector{V}_{\textrm{hub}}(i) \spc + \spc \grkvec{\omega}_{\textrm{hub}} \spc  \times \spc  \vector{r}(i) \spc + \spc \vector{V}\ud{FW}(i) \spc + \spc \vector{V}\ud{NW}(i) \spc + \spc\vector{V}\ud{B}(i)
+\end{equation}
+$\aar(i)$ represents the position vector of the point of interest from the center of the hub in non-rotating hub axes. The velocity components $\vector{V}\ud{NW}$ and $\vector{V}\ud{B}$ at all control points can be summed and expressed as a matrix-vector product of influence coefficients and bound vortex strengths, i.e. 
+\begin{equation}
+\label{eqn:inflcoeff}
+\vector{V}\ud{NW}(i) \quad + \quad \vector{V}\ud{B}(i) \quad = 
+\quad \sum_{j=1}^{N\ud{S}} \textbf{I}_\textrm{b}(i,j) \quad 
+\grkvec{\Gamma}_\textrm{b}(j)
+\end{equation}
+
+Substituting Eq. (\ref{eqn:inflcoeff}) in Eq. (\ref{eqn:indvelFW}), the bound vortex strengths can be obtained by solving a system of linear equations given by  
+\begin{equation}
+\textbf{I}_{b}(i,j) \spc  \grkvec{\Gamma}_b(j) \quad = \quad-(\vector{V}_{\textrm{hub}} \spc + \spc \grkvec{\omega}_{\textrm{hub}} \spc  \times \spc \vector{r} \spc  + \spc \vector{V}_{FW})(i)\cdot \vector{n}(i) \qquad (i = 1,2,3,...,N\ud{S})
+\end{equation}
+The subroutine \textbf{FreeWake\_MB} in the folder \textbf{Source/Wake/}computes the inflow velocities at the rotor blade control points after obtaining a converged inflow field at the rotor plane.
+
+\subsection{\textbf{Flexible Blade Dynamics}}
+The rotor blade motions are influenced by gravity, aerodynamics, inertia (including centrifugal forces), structural properties and pitch control inputs. A geometrically exact representation is used to model the main rotor blade dynamics as flexible rotating Euler-Bernoulli beams with flap, lag and torsion. The model has recently been expanded to include axial motions as well, but those upgrades have not yet been documented in this version of the manual. The calculations are performed in the subroutine \textbf{BladeDynamics}. The system states corresponding to motions of the rotor blades are given by 
+\[ \vector{y}_\textrm{rotor} \quad = \quad \renewcommand\arraystretch{0.5}\begin{Bmatrix} \spc \dot{\grkvec{\eta}}_1\tr \quad \grkvec{\eta}_{1}\tr \qquad \dot{\grkvec{\eta}}_2\tr \quad \grkvec{\eta}_{2}\tr \quad \cdots \quad \dot{\grkvec{\eta}}_\textrm{Nm}\tr \quad \grkvec{\eta}_\textrm{Nm}\tr \spc  \end{Bmatrix}\tr \] 
+The vector of generalized displacements for the `` $j^\textrm{th}$ '' mode is given by 
+\[ \grkvec{\eta}_j \quad = \quad \renewcommand\arraystretch{0.5}\begin{Bmatrix} \spc  \eta_{j,1} \qquad \eta_{j,2} \quad \cdots \quad \eta_{j,\textrm{Nb}} \spc  \end{Bmatrix}\tr \]
+$\eta_{j,i}$ represents the `` $j^\textrm{th}$ '' generalized displacement of blade `` $i$ ''. These generalized displacements are the coefficients of the normal modes corresponding to the rotating beam structure of the blade, the computation of which is discussed in Section \ref{sec:modes}. A detailed derivation of the beam dynamics is given in the following section.
+
+The call graph of the subroutine \textbf{BladeDynamics} is shown below.
+\begin{Figure}
+ \centering
+ \includegraphics[width=1.5\textwidth, angle=90]{images/BladeDynamics_callgraph.png}
+ \vspace{-0.5cm}
+ \captionof{figure}{Call graph to compute blade loads and beam equation residuals}
+ \label{fig:cg}
+\end{Figure}
+
+\subsubsection{The Blade Structural Model}
+\label{sec:strloads}
+The first step in the dynamic analysis of a rigid or flexible structure is to identify the motions of a generic point ``P''. For a flexible body, the displacement of a point contains contributions from both rigid-body translations/rotations and flexible motions. The flexible motion contributions that displace ``P'' to P$^\prime$ are used to determine the displacement field and the internal strains produced by elastic deflections. Since the structures of interest are treated as slender beams, the displacement of P can be broken down into two components : the motion of the elastic axis (and therefore the rigid translation of the cross-section containing P), and the motion of P relative to the elastic axis. 
+\begin{Figure}
+ \centering
+ \includegraphics[width=0.75\linewidth]{Schematics/Slide6.png}
+ \vspace{-0.5cm}
+ \captionof{figure}{Undeformed and Deformed Axes}
+% \label{fig:defbeam}
+\end{Figure}
+\vspace{0.5cm}
+
+The Euler-Bernoulli hypothesis is invoked here, which assumes that plane cross-sections normal to the \emph{undeformed} elastic axis before bending remain plane and normal to the \emph{deformed} elastic axis after bending. Further, the effects of shear deformation on bending are neglected. As a result of these assumptions, points that were originally located within a cross-section normal to the elastic axis before bending, remain on the same cross-section that is normal to the new elastic axis direction after bending. This implies that a cross-section rotates $\emph{as a whole}$ in a rigid-body sense about the deformed elastic axis. The axial displacement $u$ will be related to the bending displacements $v$, $w$, assuming that the elastic axis does not stretch. Therefore, the location of a point within a cross-section after bending can be computed from two translations of the elastic axis ($v$, $w$), and elastic twist of the cross-section($\phi$). 
+
+The process of beam bending can be conceptualized in two stages for every cross-section. In the first stage, the entire cross-section is translated rigidly ($u$,$v$,$w$) along the undeformed axes  without any rotations. In the second stage, the elastic axis is held fixed in space and the entire cross-section is reoriented using a Z$\rightarrow$Y$\rightarrow$X rotation sequence through angles ($\xi_1$, $\beta_1$, $\theta_1$), with the rotation matrix given in Eq. (\ref{eqn:TDU2}). The relationship between the \tee$_{DU}$ matrix and the elastic deflections $v$, $w$, $\phi$ is given below.
+
+\subsubsection{Undeformed to Deformed Frame Transformation}
+Detailed derivations of the \tee$_{DU}$ matrix are given in the literature, both with and without ordering schemes (Refs. \cite{HodgesDowell1}, \cite{Ormiston1}). To second-order, near-identical governing equations were obtained in Ref. \cite{Rosen1}. Minor differences still exist between the derivations obtained by the two authors. Hodges and Dowell (Ref. \cite{HodgesDowell1}) isolated and clearly distinguished between the derivatives along the deformed and undeformed axis while obtaining strain components and then applied the ordering scheme, while Rosen and Friedmann (Ref. \cite{Rosen1}) applied an ordering scheme \emph{before} obtaining expressions for the strain tensor. This work closely follows the Hodges and Dowell beam formulation, giving allowances for finite rotations. 
+
+The position vector of a point on the elastic axis at a distance \emph{x} from the root end of a flexible beam, after elastic bending, is given by 
+\begin{equation}
+\label{eqn:re1}
+\aar \quad = \quad (x + u) \ihat{i} \spc   + \spc  v \ihat{j} \spc  + \spc  w \ihat{k}
+\end{equation}
+By definition, the unit vector tangent to the deformed elastic axis $\ihatpr{i}$ is the gradient of the elastic axis deflection along the curvilinear coordinate \emph{r} along the deformed elastic axis (Ref. \cite{HodgesDowell1}). Thus, 
+\begin{equation}
+\label{eqn:ihatpr}
+\frac{\partial \aar}{\partial r} \spc  = \spc  \ihatpr{i} \spc = \spc  \tee_{11} \ihat{i} \spc  + \spc  \tee_{12} \ihat{j} \spc  + \spc  \tee_{13} \ihat{k} \spc  
+\end{equation}
+Here, \tee$_{ij}$ is the element in row \emph{i} and column $j$ of the \tee$_{DU}$ matrix, given in Eq. (\ref{eqn:TDU2}). Substituting Eq. (\ref{eqn:re1}) in Eq. (\ref{eqn:ihatpr}) and comparing components along $\ihat{i}$, $\ihat{j}$ and $\ihat{k}$, it is clear that 
+\begin{align}
+\label{eqn:TDUrow1}
+  (x + u)^{+} \quad = & \quad T_{11}  \\
+\label{eqn:TDUrow1b}
+  (v)^{+} 	  \quad = & \quad T_{12}  \\
+  \label{eqn:TDUrow1c}
+  (w)^{+}     \quad = & \quad T_{13}  
+\end{align}
+Comparing the terms in Eqs. (\ref{eqn:TDU2}), (\ref{eqn:TDUrow1b}), (\ref{eqn:TDUrow1c}) and applying trigonometry yields
+\begin{align}
+\label{eqn:TDUflaplag}
+  \sin \beta_1  \quad = & \quad w^+         \\
+  \cos \beta_1  \quad = & \quad \sqrt{1 - {w^+}^2}  	\\
+  \sin \xi_1  \quad = & \quad \frac{\quad v^+}{\sqrt{1-{w^+}^2}}  \\
+  \cos \xi_1  \quad = & \quad \frac{\sqrt{1 - {v^+}^2 - {w^+}^2}}{\sqrt{1-{w^+}^2}} 
+\end{align}
+An implicit assumption made in this formulation through the use of the positive square root is that the bending slopes do not exceed 90$^\circ$ in magnitude. The third rotation angle $\theta_1$ may be obtained from the \tee$_{DU}$ matrix. Consider a point on the elastic axis at a location \emph{r}. The deformed beam axes at \emph{r+dr} can be obtained using three rotations ($\kappa_3$ $dr$, $\kappa_2$ $dr$, $\kappa_1$ $dr$) about the deformed beam axes ($\ihatpr{i}$, $\ihatpr{j}$, $\ihatpr{k}$) at \emph{r}. The gradient of these rotations along the span of the beam are, by definition, the \emph{curvatures} (Ref. \cite{Kreyszig1997}) $\kappa_3$, $\kappa_2$, $\kappa_1$. Since these rotations are infinitesimal in nature, terms in $dr^2$ and $dr^3$ can be neglected and so we obtain an expression for the spatial derivative (along \emph{r}) of the unit vectors defining the deformed beam axes 
+\begin{equation}
+\label{eqn:curvature1}
+\frac{\partial}{\partial r} \qmat{\prime} \quad = \quad 
+\begin{bmatrix}
+0 & \kappa_3 & -\kappa_2 \\
+-\kappa_3 & 0 & \kappa_1 \\
+\kappa_2 & -\kappa_1 & 0 \end{bmatrix} \qmat{\prime} 
+\quad = \quad \boldsymbol\kappa  \quad \tee_{DU} \pmat{ }
+\end{equation}
+Where 
+\begin{equation}
+\label{eqn:curvaturedef}
+\boldsymbol\kappa  \quad = \quad \begin{bmatrix}
+0 & \kappa_3 & -\kappa_2 \\
+-\kappa_3 & 0 & \kappa_1 \\
+\kappa_2 & -\kappa_1 & 0 \end{bmatrix}
+\end{equation}
+Differentiate Eq. (\ref{eqn:TDU1}) once with respect to \emph{r} to obtain
+\begin{equation}
+\label{eqn:curvature2}
+\frac{\partial}{\partial r} \qmat{\prime} \quad = \quad \frac{\partial \tee_{DU}}{\partial r} \pmat{}
+\end{equation}
+Comparing the expressions on the right hand side of Eqs. (\ref{eqn:curvature1}) and (\ref{eqn:curvature2})
+\[\boldsymbol\kappa \quad  \tee_{DU} \quad = \quad \tee_{DU}^{+}\]
+Rearranging and using \tee$_{DU}\tr$ \quad = \quad \tee$_{DU}^{-1}$ \quad = \quad \tee$_{UD}$, we obtain
+\begin{equation}
+\label{eqn:curvature3}
+\boldsymbol\kappa \quad = \quad \tee_{DU}^+ \quad \tee_{DU}\tr 
+\end{equation} 
+After carrying out matrix multiplications, we obtain expressions for the curvatures 
+\begin{equation}
+\label{eqn:curvatures}
+\left.
+\begin{aligned}
+\kappa_1 \quad = \quad & \theta_1^+ \spc  + \spc  \xi_1^+ w^+  \quad = \quad (\theta_t + \phi)^+ \qquad \qquad \qquad \\
+\kappa_2 \quad = \quad & -\beta_1^+ \cos \theta_1 \spc  + \spc  \xi_1^+ \cos \beta_1 \sin \theta_1 \qquad \qquad \qquad \\
+\kappa_3 \quad = \quad &\xi_1^+ \cos\beta_1 \cos \theta_1 \spc  + \spc  \beta_1^+ \sin \theta_1 \qquad \qquad \qquad 
+\end{aligned}
+\right\}
+\end{equation}
+$\theta_t$ is the rigid pre-twist of the beam and $\phi$ is the elastic twist. Substituting for $\xi_1^+$ from Eq. (\ref{eqn:TDUflaplag}) and integrating along the deformed elastic axis, we obtain 
+\begin{equation}
+\label{eqn:3rdanglepitch}
+\theta_1 = \theta_t + \phi - \int_{0}^{r} \frac{w^+}{\sqrt{1 - {v^+}^2 - {w^+}^2}} \left(v^{++} + \frac{v^+ w^+ w^{++}}{1 - {w^+}^2}\right) dr
+\end{equation}
+
+\subsubsection*{Time Derivatives of Euler Angles}
+The third Euler angle $\theta_1$ used to determine the $\tee_{DU}$ matrix is given by
+\[ \theta_1 \quad = \quad \theta_t \textrm{ }+ \textrm{ }\phi \textrm{ }- \textrm{ }\int_0^r \textrm{ }\xi_1^+ \textrm{ }w^+ \textrm{ } dr \]
+\begin{itemize}
+\item $\theta_t$ represents the beam geometric twist, obtained from the input data from table look-up
+\item $\phi$ is the elastic twist of the beam and $w^+$ the spatial derivative of the flap deflection, obtained from the shape functions and nodal degrees of freedom
+\item $\xi^+_1$ is obtained as follows from Eqs. (\ref{eqn:TDUflaplag})
+\begin{align*}
+w^+ \quad = \quad & \sin \beta_1 \\
+\Rightarrow \quad \beta_1^+ \quad = \quad & \frac{w^{++}}{\cos \beta_1} \\
+v^+ \quad = \quad & \sin \xi_1 \textrm{ }\cos \beta_1 \\
+\Rightarrow \quad v^{++} \quad = \quad & \cos \xi_1 \cos \beta_1 \textrm{ }\xi_1^+ \textrm{ } - \textrm{ } \sin \xi_1 \textrm{ }\sin \beta_1 \textrm{ }\beta_1^+ \\
+\xi_1^+ \quad = \quad & \frac{v^{++} \textrm{ } + \textrm{ } \sin \xi_1 \textrm{ }\sin \beta_1 \textrm{ } \beta_1^+}{\cos \xi_1 \textrm{ }\cos \beta_1} 
+\end{align*}
+\end{itemize}
+Differentiate Eq. (\ref{eqn:3rdanglepitch}) once with respect to time to obtain
+\[ \dot{\theta}_1 \quad = \quad \dot{\phi} \textrm{ } - \textrm{ }\int_0^r \textrm{ }\left(\xi_1^+ \textrm{ } \dot{w}^+ \quad  + \quad  \dot{\xi}_1^+ \textrm{ } w^+ \right) \textrm{ } dr \]
+The time derivatives $\dot{\xi}_1^+$ can be obtained by differentiating the expression for $\beta_1^+$ and $\xi^+$ above once with respect to time 
+\begin{align*}
+\dot{\beta}_1^+ \quad = \quad &\frac{\dot{w}^{++} \textrm{ } + \textrm{ } \beta_1^+ \textrm{ }  \dot{\beta}_1 \textrm{ } \sin \beta_1}{\cos \beta_1} \\
+\begin{split}
+\dot{\xi}^+_1 \quad = \quad &\frac{1}{\cos \xi_1 \textrm{ }\cos \beta_1}  \left[\textrm{ }\dot{v}^{++} \textrm{ }+\textrm{ } \dot{\beta}_1^+ \textrm{ } \sin \xi_1 \textrm{ }\sin \beta_1 \textrm{ }+\textrm{ }\sin \xi_1 \textrm{ }\cos \beta_1 \left(\beta_1^+ \textrm{ }\dot{\beta}_1 \textrm{ }+\textrm{ }\xi_1^+ \textrm{ }\dot{\xi}_1\right) \right. \\
+& \left. \qquad \qquad \qquad \textrm{ } \qquad +\textrm{ }\cos \xi_1 \textrm{ }\sin \beta_1 \left(\beta_1^+ \textrm{ }\dot{\xi_1} \textrm{ }+\textrm{ }\xi^+_1 \textrm{ }\dot{\beta}_1\right) \right]
+\end{split}
+\end{align*}
+Differentiate Eq. (\ref{eqn:3rdanglepitch}) twice with respect to time to obtain
+\begin{equation*}
+\ddot{\theta}_1 \quad = \quad \ddot{\phi} \textrm{ } - \textrm{ }\int_0^r \textrm{ }\left(\xi_1^+ \textrm{ } \ddot{w}^+ \quad  + \quad  \ddot{\xi}_1^+ \textrm{ } w^+ \quad + \quad 2 \textrm{ } \dot{\xi}_1^+ \textrm{ } \dot{w}^+ \right) \textrm{ } dr \end{equation*}
+The term $\ddot{\xi}_1^+$ is obtained by differentiating the expressions for $\dot{\beta}_1^+$ and $\dot{\xi}_1^+$ once with respect to time to obtain
+\begin{align*}
+\ddot{\beta}_1^+ \quad = \quad &\frac{\ddot{w}^{++} \textrm{ } + \textrm{ } \beta_1^+ \textrm{ }  \ddot{\beta}_1 \textrm{ } \sin \beta_1 \textrm{ } + \textrm{ } 2 \textrm{ }\dot{\beta}_1 \textrm{ } \dot{\beta}_1^+ \textrm{ }\sin \beta_1 \textrm{ }+\textrm{ } \beta_1^+ \textrm{ }\dot{\beta}_1^2 \textrm{ }\cos \beta_1 }{\cos \beta_1} \\
+\begin{split}
+\ddot{\xi}^+_1 \quad = \quad &\frac{1}{\cos \xi_1 \textrm{ }\cos \beta_1}  \left[\textrm{ }\ddot{v}^{++} \textrm{ }+\textrm{ } \sin \xi_1 \textrm{ }\cos \beta_1 \left( 2 \textrm{ }\dot{\xi}_1 \textrm{ }\dot{\xi}_1^+ \textrm{ }+\textrm{ } 2 \textrm{ }\dot{\beta}_1 \textrm{ }\dot{\beta}_1^+ \textrm{ }+\textrm{ } \ddot{\beta}_1 \textrm{ }\beta_1^+ \textrm{ }+\textrm{ } \ddot{\xi}_1 \textrm{ }\xi_1^+ \right) \right. \\
+& \left. \qquad \qquad \qquad \qquad \textrm{ }+\textrm{ }\cos \xi_1 \textrm{ }\sin \beta_1 \left(2 \textrm{ } \dot{\beta}_1 \textrm{ }\dot{\xi}_1^+ \textrm{ }+\textrm{ }2 \textrm{ }\dot{\xi}_1 \textrm{ }\dot{\beta}_1^+ \textrm{ }+\textrm{ }\ddot{\xi}_1\textrm{ }\beta_1^+ \textrm{ }+\textrm{ }\ddot{\beta}_1 \textrm{ }\xi_1^+ \right) \right. \\
+& \left. \qquad \qquad \qquad \qquad \textrm{ }+\textrm{ } \sin \xi_1 \textrm{ }\sin \beta_1 \left(\textrm{ }\ddot{\beta}_1^+ \textrm{ } -\textrm{ }\dot{\beta}_1^2 \textrm{ }\beta_1^+ \textrm{ }-\textrm{ }2 \textrm{ }\dot{\beta}_1 \xi^+_1 \textrm{ }\dot{\xi}_1 \textrm{ }-\textrm{ }\beta_1^+ \textrm{ }\dot{\xi}_1^2 \right) \right. \\
+& \left. \qquad \qquad \qquad \qquad \textrm{ }+\textrm{ } \cos \xi_1 \textrm{ }\cos \beta_1 \left(2 \textrm{ } \dot{\beta}_1 \textrm{ }\dot{\xi}_1 \textrm{ }\beta_1^+ \textrm{ }+\textrm{ } \dot{\xi}_1^2 \textrm{ }\xi_1^+ \textrm{ }+\textrm{ }\dot{\beta}_1^2 \textrm{ } \xi_1^+ \right) \right]
+\end{split}
+\end{align*}
+Finally, $\dot{\beta}_1$, $\ddot{\beta}_1$, $\dot{\xi}_1$ and $\ddot{\xi}_1$ are obtained by differentiating the expressions for $w^+$ and $v^+$ with respect to time 
+\begin{align*}
+\dot{\beta}_1 \quad = \quad &\frac{\dot{w}^+ }{\cos \beta_1} \\
+\dot{\xi}_1 \quad = \quad &\frac{\dot{v}^+ \textrm{ } + \textrm{ } \sin \xi_1 \textrm{ } \sin \beta_1 \textrm{ } \dot{\beta}_1}{\cos \xi_1 \textrm{ } \cos \beta_1} \\
+\ddot{\beta}_1 \quad = \quad & \frac{\ddot{w}^+ \textrm{ } + \textrm{ } \dot{\beta}_1^2 \textrm{ }\sin \beta_1}{\cos \beta_1} \\
+%\begin{split}
+\ddot{\xi}_1 \quad = \quad &\frac{\textrm{ }\ddot{v}^{+} \textrm{ }+\textrm{ } \sin \xi_1 \textrm{ } \cos \beta_1 \left(\dot{\xi}_1^2 \textrm{ } + \textrm{ } \dot{\beta}_1^2\right) \textrm{ } + \textrm{ } 2 \textrm{ }\dot{\xi}_1 \textrm{ } \dot{\beta}_1 \textrm{ } \cos \xi_1 \textrm{ } \sin \beta_1 \textrm{ } +\textrm{ } \ddot{\beta}_1 \textrm{ }\sin \xi_1 \textrm{ } \sin \beta_1}{\cos \xi_1 \textrm{ }\cos \beta_1} 
+%& \left. \qquad \qquad \qquad \textrm{ } \qquad +\textrm{ }\cos \xi_1 \textrm{ }\sin \beta_1 \left(\beta_1^+ \textrm{ }\dot{\xi_1} \textrm{ }+\textrm{ }\xi^+_1 \textrm{ }\dot{\beta}_1^+\right) \right]
+%\end{split}
+\end{align*}
+Displacement quantities at all quadrature points in each element are computed in the subroutine \textbf{beam\_displacements} in the folder \textbf{beamdynamics}, and stored in a derived type \textbf{DisptDef}.
+
+\subsubsection{Strain, Stress and Structural Loads}
+The strain tensor components are derived using the displacement field. The expressions are repeated from Ref. \cite{HodgesDowell1}, neglecting axial stretch and warping effects. The strain tensor components acting at a point ($\eta$,$\zeta$) on a cross-section of the beam are 
+\begin{align}
+\label{eqn:strains1}
+2 \epsilon_{11} \quad = & \quad (-\eta \kappa_3 + \zeta \kappa_2)^2 \quad + \quad \kappa_1^2 (\zeta^2 + \eta^2) \quad + \quad 2(-\eta \kappa_3 + \zeta \kappa_2) \notag\\
+& + \quad (v^{+^2} + w^{+^2} - u^{+^2}) \quad + \quad 2 u^+ \sqrt{1 - v^{+^2} - w^{+^2}} \notag \\
+& - \quad \theta^{+^2} (\eta_0^2 + \zeta_0^2) \\
+2 \epsilon_{12} \quad = & -\zeta \kappa_1 \quad + \quad \left(\frac{d \eta_0}{d \eta}\right) \theta^{+}  \zeta_0 \notag \\
+2 \epsilon_{13} \quad = & \quad \eta \kappa_1 \quad - \quad \left(\frac{d \zeta_0}{d \zeta}\right) \theta^{+} \eta_0 \notag \\
+2 \epsilon_{22} \quad = & \quad 1 \qquad - \quad \left(\frac{d \eta_0}{d \eta}\right)^2 \notag \\
+2 \epsilon_{23} \quad = & \quad 0 \notag \\
+2 \epsilon_{33} \quad = & \quad 1 \qquad - \quad \left(\frac{d \zeta_0}{d \zeta}\right)^2 \notag
+\end{align}
+
+\begin{Figure}
+ \centering
+ \includegraphics[width=0.65\linewidth]{./Schematics/Slide16.png}
+ \vspace{-0.5cm}
+ \captionof{figure}{Coordinates of a Point in a Cross-Section along Beam Deformed Axes}
+ \label{fig:beamCS}
+\end{Figure}
+\vspace{0.5cm}
+Application of Hooke`s law for an isotropic material yields
+\begin{equation}
+\label{eqn:HookesLaw1}
+\left.
+\begin{aligned}
+\begin{bmatrix}
+\sigma_{11} \\ 
+\sigma_{22} \\
+\sigma_{33} \\
+\end{bmatrix} \quad = & \quad 
+\frac{E}{(1+\nu)(1-2\nu)}
+\begin{bmatrix}
+1 - \nu & \nu & \nu \\
+\nu & 1 - \nu & \nu \\
+\nu & \nu & 1 - \nu 
+\end{bmatrix}
+\begin{bmatrix}
+\epsilon_{11} \\ \epsilon_{22} \\ \epsilon_{33} \end{bmatrix} \qquad \quad \\
+\begin{bmatrix} \sigma_{23} \\ \sigma_{31} \\ \sigma_{12} \end{bmatrix} \quad = & \quad 
+G \begin{bmatrix}
+\epsilon_{23} \\ \epsilon_{31} \\ \epsilon_{12} \end{bmatrix} \qquad \quad
+\end{aligned}
+\right\}
+\end{equation}
+
+The uni-axial stress assumption, which is valid for long slender beams, is invoked at this stage. Under this assumption,
+\[ \sigma_{22} \quad = \quad \sigma_{33} \quad = \quad \sigma_{23} \quad \stackrel{\text{def}}{=}  \quad 0 \]
+This assumption is used to obtain the derivatives $\displaystyle\frac{d\eta_0}{d\eta}$ and $\displaystyle\frac{d\zeta_0}{d\zeta}$ as 
+\begin{equation}
+\label{eqn:CSderiv}
+\frac{d \eta_0}{d \eta} \quad = \quad \frac{d \zeta_0}{d \zeta} \quad = \quad \sqrt{1 \quad + \quad 2 \nu \epsilon_{11}}
+\end{equation}
+The material stresses are obtained by inverting Eqs. (\ref{eqn:HookesLaw1}) as 
+\begin{equation}
+\label{eqn:beamstress}
+\left.
+\begin{aligned}
+\sigma_{11} \quad = & \quad E \epsilon_{11} \qquad \qquad \qquad \qquad \qquad \qquad \qquad \\
+\sigma_{12} \quad = & \quad G \epsilon_{12} \qquad \qquad \qquad \qquad \qquad \qquad \qquad \\
+\sigma_{13} \quad = & \quad G \epsilon_{13} \qquad \qquad \qquad \qquad \qquad \qquad \qquad 
+\end{aligned}
+\right\}
+\end{equation}
+The structural loads at a cross-section are obtained by integrating the stresses over the area. The elastic force vector is 
+\[\vector{F}_s \quad = \quad S_x \ihatpr{i} \quad + \quad  S_y \ihatpr{j} \quad + \quad S_z \ihatpr{k} \]
+\begin{equation}
+\left.
+\label{eqn:SXYZ}
+\begin{aligned}
+S_x \quad = & \qquad \int \int_A \sigma_{11} dA \qquad \qquad \qquad \qquad \qquad \\
+S_y \quad = & \quad 2 \int \int_A \sigma_{12} dA \qquad \qquad \qquad \qquad \qquad \\
+S_z \quad = & \quad 2 \int \int_A \sigma_{13} dA \qquad \qquad \qquad \qquad \qquad \\
+\end{aligned}
+\right\}
+\end{equation}
+The components of the elastic moment about the deformed beam axes are obtained by integrating over the cross-section, moments of the material stresses about the deformed elastic axis. The total elastic moment is 
+\[\vector{M}_s \quad = \quad M_x \ihatpr{i} \quad + \quad  M_y \ihatpr{j} \quad + \quad M_z \ihatpr{k} \]
+Where 
+\begin{equation}
+\label{eqn:MXYZ}
+\left.
+\begin{aligned}
+M_x \quad = & \qquad 2 \int \int_A \left(\quad \eta \sigma_{13} \quad - \quad \zeta \sigma_{12} \quad \right) dA \quad \\
+M_y \quad = & \qquad \int \int_A \zeta \sigma_{11} dA \quad \\
+M_z \quad = & \quad -\int \int_A \eta \sigma_{11} dA \quad 
+\end{aligned}
+\right\}
+\end{equation}
+The relationship between ($\zeta$,$\eta$) and ($\zeta_0$,$\eta_0$) can be determined using an assumption of small axial strain $\epsilon_{11}$. Most materials can withstand 0.2\% of strain ($\epsilon_{11}$ = 0.002) before exhibiting inelastic behavior and hysteresis. Further, the Poisson`s ratio $\nu$ is less than unity for typical materials used in rotor blade and cable construction (metals and carbon composites). Thus, an upper limit for the derivatives $\displaystyle{\frac{d\eta_0}{d \eta}}$ and $\displaystyle{\frac{d\zeta_0}{d\zeta}}$ can be obtained from Eq. (\ref{eqn:CSderiv}) as
+\begin{equation}
+\label{eqn:CSderiv2}
+\frac{d \eta_0}{d \eta} \quad = \quad \frac{d \zeta_0}{d \zeta} \quad <= \quad \sqrt{1 \quad + \quad 2 \times 0.002} \approx 1.001
+\end{equation}
+Based on the upper limit obtained above, a further approximation can be made - the location of points in a cross-section remain fixed with respect to the elastic axis, for the purposes of obtaining structural loads via integration over the cross-section. Thus, it is reasonable to assume that the cross-section coordinates after bending ($\eta$, $\zeta$) are identical to their counterparts ($\eta_0$, $\zeta_0$) before bending.
+\[\eta \quad \approx \quad \eta_0 \qquad \textrm{and} \qquad \zeta \quad \approx \quad \zeta_0 \]
+Substituting for the stresses from Eq. (\ref{eqn:beamstress}), the structural moment components about the deformed elastic axes are obtained as
+\begin{equation}
+\label{eqn:MX}
+M_x \quad = \quad G \int \int_A [\qquad [\eta^2 + \zeta^2] \quad (\kappa_1 - \theta^+ ) \quad + \quad 2 \eta \zeta (\nu \epsilon_{11}) \qquad] \quad dA 
+\end{equation}
+\begin{equation}
+\label{eqn:MY}
+\left.
+\begin{aligned}
+2 M_y \quad = \quad E \int \int_A [\quad & \eta^2 \zeta (\kappa_3^2+\kappa_1^2-\theta^{+^2}) \quad + \quad \zeta^3 (\kappa_2^2+\kappa_1^2-\theta^{+^2}) \\
+\quad + \quad & \eta \zeta (-2 \kappa_3) \quad + \quad \zeta^2(2 \kappa_2) \quad + \quad \eta \zeta^2 (-2 \kappa_3 \kappa_2) \\
+\quad + \quad & \zeta(v^{+^2} + w^{+^2} - u^{+^2} + 2 u^+ \sqrt{1-v^{+^2}-w^{+^2}}) ] \quad dA \qquad
+\end{aligned}
+\right\}
+\end{equation}
+\begin{equation}
+\label{eqn:MZ}
+\left.
+\begin{aligned}
+2 M_z \quad = \quad E \int \int_A [\quad &\eta^3 \left(\theta^{+^2} - \kappa_3^2-\kappa_1^2\right) \quad + \quad \zeta^2 \eta  \left(\theta^{+^2} - \kappa_2^2 - \kappa_1^2\right) \\
+\quad + \quad & 2 \eta^2 (\kappa_3) \quad - \quad 2 \zeta \eta (\kappa_2) \quad + \quad 2 \eta^2 \zeta (\kappa_3 \kappa_2) \\
+\quad - \quad & \eta \left(v^{+^2} + w^{+^2} - u^{+^2} + 2 u^+ \sqrt{1-v^{+^2}-w^{+^2}}\right) ] \quad dA \quad
+\end{aligned}
+\right\}
+\end{equation}
+\vspace{0.3cm}
+In each of the integrals, the terms in the parentheses are constant across a cross-section. Another assumption is introduced at this stage - that the \emph{load-carrying members of the cross-section} are symmetric about the $\eta$ axis. Thus, all integrals over odd polynomials in $\zeta$ vanish, and the expressions reduce to 
+\begin{align*}
+M_x \quad = \quad & G \int \int_A \quad (\eta^2 + \zeta^2) \quad (\kappa_1 - \theta^+ )\quad dA \\
+2 M_y \quad = \quad & E \int \int_A [\quad \zeta^2(2 \kappa_2) \quad + \quad \eta \zeta^2 (-2 \kappa_3 \kappa_2)] \quad dA \\
+2 M_z \quad = \quad & E \int \int_A [\quad \eta^3 \left(\theta^{+^2} - \kappa_3^2-\kappa_1^2\right) \quad + \quad \zeta^2 \eta  \left(\theta^{+^2} - \kappa_2^2 - \kappa_1^2\right) \quad + \quad 2 \eta^2 (\kappa_3) \\
+& \qquad - \quad \eta \left(v^{+^2} + w^{+^2} - u^{+^2} + 2 u^+ \sqrt{1-v^{+^2}-w^{+^2}}\right) ] \quad dA
+\end{align*}
+\vspace{0.3cm}
+The cross-section integrals are second and third moments of area, and the above expressions can be reduced to 
+\begin{align}
+\label{eqn:StrlMoment}
+M_x \quad = \quad \quad & G J (\phi^+) \notag \\
+M_y \quad = \quad \quad &E I_{\eta \eta} (\kappa_2) \quad - E I_{\eta \eta \zeta} (\kappa_3 \kappa_2) \notag \\
+M_z \quad = \quad \quad &\frac{1}{2} E I_{\zeta \zeta \zeta} \left(\theta^{+^2} - \kappa_3^2 - \kappa_1^2\right) \quad + \quad \frac{1}{2} E I_{\eta \eta \zeta} \left(\theta^{+^2} - \kappa_2^2-\kappa_1^2\right) \quad + \quad E I_{\zeta \zeta} (\kappa_3) \notag \\
+- \quad & \frac{1}{2} E A e_A \left(v^{+^2} + w^{+^2} - u^{+^2} + 2 u^+ \sqrt{1-v^{+^2}-w^{+^2}}\right)
+\end{align}
+
+The terms in parentheses are functions of deflection and beam  pre-twist. The terms outside the parentheses are cross-section properties, i.e. the area moments of inertia and are given by 
+\begin{align*}
+I_{\zeta \zeta} \quad = \quad & \int \int_A \quad \eta^2 \quad  \quad dA \\
+I_{\eta \eta} \quad = \quad & \int \int_A \quad \zeta^2 \quad  \quad dA \\
+J \quad \quad = \quad & I_{\zeta \zeta} + I_{\eta \eta} \\
+I_{\zeta \zeta \zeta} \quad = \quad & \int \int_A \quad \eta^3 \quad  \quad dA \\
+I_{\eta \eta \zeta} \quad = \quad & \int \int_A \quad \zeta^2 \eta \quad  \quad dA \\
+A \quad = \quad & \int \int_A \quad dA \\
+A e_A \quad = \quad & \int \int_A \quad \eta \quad dA
+\end{align*}
+
+\subsubsection*{Spatial Derivatives : Deformed and Undeformed Elastic Axis}
+The relationship between the spatial derivatives $\frac{\partial}{\partial r}$ and $\frac{\partial}{\partial x}$ is obtained using geometry. The differential along the deformed elastic axis may be written as 
+\begin{equation}
+\label{eqn:dretc}
+dr \quad = \quad \sqrt{(dx+du)^2 \quad + \quad dv^2 \quad + \quad dw^2}
+\end{equation}
+Dividing Eq. (\ref{eqn:dretc}) by dx, we obtain
+\[ \frac{dr}{dx} \quad = \quad \sqrt{(1 + u^\prime)^2 \quad + \quad {v^\prime} ^2 \quad + \quad {w^\prime}^2} \]
+Using 
+\[\frac{dr}{dx} \quad = \quad \frac{1}{\frac{dx}{dr}} \quad = \quad \frac{1}{x^+} \]
+We obtain
+\begin{equation}
+x^+ \quad = \quad \frac{1}{\sqrt{(1 + u^\prime)^2 \quad + \quad {v^\prime}^2 \quad + \quad {w^\prime}^2}}
+\end{equation}
+Thus,
+\begin{equation}
+()^+ \quad = \quad \frac{\partial}{\partial r} () \quad = \quad \frac{\partial}{\partial x} () x^+ \quad = \quad ()^\prime x^+
+\end{equation}
+Squaring Eq. (\ref{eqn:dretc}) and dividing by dr$^2$, we obtain
+\begin{equation}
+\label{eqn:pluses}
+1 \quad = \quad (x+u)^{+^2} \quad + \quad v^{+^2} \quad + \quad w^{+^2} 
+\end{equation}
+Substituting Eq. (\ref{eqn:pluses}) in Eq. (\ref{eqn:StrlMoment}), the component of the structural moment about the $\ihatpr{k}$ axis simplifies to 
+\begin{equation}
+\label{eqn:ZmomentStr}
+\begin{split}
+M_z \quad = \quad & \quad \frac{1}{2} E I_{\zeta \zeta \zeta} \left(\theta^{+^2} - \kappa_3^2 - \kappa_1^2 \right) \quad + \quad \frac{1}{2} E I_{\eta \eta \zeta} \left(\theta^{+^2} - \kappa_2^2 - \kappa_1^2\right) \\
++ & \quad E I_{\zeta \zeta} (\kappa_3) \quad - \quad \frac{1}{2} E A e_A \left( 1 - x^{+^2} \right)
+\end{split}
+\end{equation}
+
+\subsubsection{Ordering Scheme}
+Some of the area moments of inertia can be neglected because they are small \emph{in comparison} to other terms. The cross-sections of interest have dimensions that are 10\% of the span along the $\eta$ coordinate, and 1\% span along the $\zeta$ coordinate. Estimates for the higher moments of inertia may be obtained assuming rectangular cross-sections, and the relative magnitudes of the terms in the equations may be compared based on curvatures corresponding to a strain limit of 0.002. This analysis provides estimates for the orders of magnitude of individual terms (expressed in Newton-meters), for a beam of length ``R'' and allows us to identify the dominant terms, if any. The $\kappa$ in Eqs. (\ref{eqn:relativemags}) refers to the bending curvatures only, and the twist rate $\kappa_1$ must be handled separately. While this ordering scheme is not necessary to obtain a solution, it gives an important physical insight: that the structural loads of interest are governed by a select few cross-section properties and displacement parameters.
+
+\begin{equation}
+\label{eqn:relativemags}
+\left.
+\begin{aligned}
+EI_{\eta \eta \zeta} \kappa^2 \quad = \quad E \kappa^2 \quad & \int \int_A \quad \zeta^2 \eta \quad dA \quad \approx \quad 10^{-2} R^3  \\
+\quad EI_{\zeta \zeta \zeta} \kappa^2 \quad = \quad E \kappa^2 \quad & \int \int_A \quad \eta^3 \quad dA \quad \approx \quad 10^{0} R^3  \\
+\quad EI_{\eta \eta} \kappa \quad = \quad E \kappa \quad & \int \int_A \quad \zeta^2 \quad dA \quad \approx \quad 10^{1} R^3 \qquad \qquad \qquad \qquad \qquad \\
+EI_{\zeta \zeta} \kappa \quad =  \quad E \kappa \quad & \int \int_A \quad \eta^2 \quad dA \quad \approx \quad 10^3 R^3 
+\end{aligned}
+\right\}
+\end{equation}
+An inspection of Eqs. (\ref{eqn:StrlMoment}) reveals that in the $\ihatpr{j}$ component, the dominant term is EI$_{\eta \eta}$ $\kappa_2$, which is at least three orders of magnitude higher than EI$_{\eta \eta \zeta}$ $\kappa_3 \kappa_2$.  
+Similarly, the $\ihatpr{k}$ component is dominated by EI$_{\zeta\zeta}$, which is at least three orders of magnitude larger than the two terms involving third moments of inertia and squares of bending curvatures. With this rationalization, the structural moment components about the deformed elastic axes can be reduced (using Eq. (\ref{eqn:ZmomentStr}) for the $\ihatpr{k}$ component) to
+\begin{equation}
+\left.
+\label{eqn:StrlMomentDeformed}
+\begin{aligned}
+M_x \quad &= \quad G J (\phi^+) \\
+M_y \quad &= \quad E I_y (\kappa_2) \\
+M_z \quad &= \quad E I_{\zeta \zeta} (\kappa_3) \quad - \quad \frac{1}{2} E A e_A \left(1 - x^{+^2} \right) \quad - \quad EB_2 \left(\theta^+ \phi^+ + \frac{1}{2}\phi^{+^2}\right) \qquad
+\end{aligned}
+\right\}
+\end{equation}
+Here, $I_y$ = $I_{\eta \eta}$ is the flap-wise moment of area for the cross-section about the \emph{neutral} axis, and $EB_2$ = $I_{\eta \eta \zeta}$ + $I_{\zeta\zeta\zeta}$. The twist rate terms are preserved with the present ordering scheme to retain the ability to model dynamics of beams with large geometric pre-twist (e.g. propeller and tilt-rotor blades). The terms in parentheses depend on the deflection ($v$,$w$) and twist ($\phi$) of the elastic axis, while the terms outside the parentheses are functions of the cross-section shape and material properties. 
+
+\subsubsection{Conversion of Structural Loads to Undeformed Frame}
+The \tee$_{DU}$ matrix can be used to convert the structural forces and moments to the undeformed frame, which is used to formulate the governing equations. The quantities of interest are the structural moments and their derivatives. The spatial derivative of the components of the structural moment about the undeformed axes are
+
+\begin{equation}
+\label{eqn:momentrotation}
+\begin{Bmatrix}\widetilde{M}_x^+ \\ \widetilde{M}_y^+ \\ \widetilde{M}_z^+ \end{Bmatrix} \quad = \quad \left(\tee_{DU}\tr\right)^+ \begin{Bmatrix} M_x \\ M_y \\ M_z \end{Bmatrix} \quad + \quad \tee_{DU}^{T} \begin{Bmatrix} M_x^+ \\ M_y^+ \\ M_z^+ \end{Bmatrix}
+\end{equation}
+
+\subsubsection{Governing Equations}
+The next step is to relate the structural moments to the axial and shear forces at a cross-section, accomplished by applying force and moment equilibrium to a section of the elastic axis that is acted upon by external forces and moments. The external loads per unit span due to the cumulative effects of inertia, gravity, buoyancy and fluid forces are denoted by $\vector{p}$ and $\vector{q}$ respectively. Applying force equilibrium for an element of length \emph{dr}, we obtain 
+\[\vector{p} \quad + \quad \vector{F}_s^+ \quad = \quad \vector{0}\]
+Moment equilibrium, when applied to a point on the elastic axis segment of length $dr$, yields after neglecting squares in the infinitesimal $dr$
+\begin{equation}
+\vector{q} \quad + \quad \vector{M}_s^+ \quad + \quad \ihatpr{i} \spc \times \spc \vector{F}_s \quad = \quad \vector{0}
+\end{equation}
+$\vector{F}_s$ represents the structural force vector. Resolving into components along the undeformed axes, we obtain
+\begin{equation}
+\label{eqn:beamforcebalance}
+\begin{Bmatrix} \tilde{p}_x \\ \tilde{p}_y \\ \tilde{p}_z \end{Bmatrix} \quad = \quad - \begin{Bmatrix} \widetilde{S}_x^+ \\ \widetilde{S}_y^+ \\ \widetilde{S}_z^+ \end{Bmatrix} 
+\end{equation}
+\begin{equation}
+\label{eqn:beammomentbalance}.
+\begin{Bmatrix} \tilde{q}_x \\ \tilde{q}_y \\ \tilde{q}_z \end{Bmatrix} \quad + \quad 
+\begin{Bmatrix} \widetilde{M}_x^+ \\ \widetilde{M}_y^+ \\ \widetilde{M}_z^+ \end{Bmatrix} \quad + \quad 
+\begin{Bmatrix} T_{12} \widetilde{S}_z - T_{13} \widetilde{S}_y \\ T_{13} \widetilde{S}_x - T_{11} \widetilde{S}_z  \\
+T_{11} \widetilde{S}_y - T_{12} \widetilde{S}_x 
+ \end{Bmatrix} \quad = \quad \vector{0}
+\end{equation}
+The shear forces can be expressed in terms of the structural moments and the axial force using Eq. (\ref{eqn:beammomentbalance}) as 
+\begin{equation}
+\left.
+\label{eqn:beamshears}
+\begin{aligned}
+\widetilde{S}_y \quad = \quad & \frac{T_{12}}{T_{11}} \widetilde{S}_x \quad  - \quad \left(\widetilde{M}_z^+ + \tilde{q}_z \right) \frac{1}{T_{11}}  \\
+\widetilde{S}_z \quad = \quad & \frac{T_{13}}{T_{11}} \widetilde{S}_x \quad + \quad \left(\widetilde{M}_y^+ + \tilde{q}_y \right) \frac{1}{T_{11}} \quad\quad\quad\\
+\end{aligned}
+\right\}
+\end{equation}
+T$_{ij}$ is the entry in row \emph{i} and column \emph{j} of the T$_{DU}$ matrix given in Eq. (\ref{eqn:TDU2}). Substituting expressions for the shear forces in Eq. (\ref{eqn:beamshears}) in the X-component of Eq. (\ref{eqn:beammomentbalance}) yields
+\begin{equation*}
+\widetilde{M}_x^+ \quad + \quad \frac{T_{12}}{T_{11}} \quad  \left(\widetilde{M}_y^+ + \tilde{q}_y \right) \quad + \quad \frac{T_{13}}{T_{11}} \quad \left(\widetilde{M}_z^+ + \tilde{q}_z \right) \quad + \quad \tilde{q}_x \quad = \quad 0
+\end{equation*}
+The expressions on the left hand side are exactly equal to the spatial gradient of the torsion moment along the deformed elastic axis. After multiplying by T$_{11}$, the equation reduces to 
+\begin{equation}
+\label{eqn:beamtorsion1}
+\vector{M}_s^+ \cdot \ihatpr{i} \quad + \quad q_x \quad = \quad 0
+\end{equation}
+Premultiply Eq. (\ref{eqn:momentrotation}) by \tee$_{DU}$ to obtain 
+\begin{equation}
+\tee_{DU} \udvec{M}_s^+ \quad = \quad \tee_{DU} \tee_{DU}^{T^+} \vector{M}_s \quad + \quad \tee_{DU} \tee_{DU}^{T} \vector{M}_s^+ 
+\end{equation}
+The equation can be simplified further, using the following identities
+\begin{equation*}
+\begin{aligned}
+\tee_{DU} \quad \tee_{DU}\tr \quad = &\quad \textbf{I} \\
+\tee_{DU}^+ \quad \tee_{DU}\tr \quad + \quad \tee_{DU} \tee_{DU}^{T^+} = &\quad \textbf{0} \\
+\boldsymbol{\kappa} \quad = \quad \tee_{DU}^+ \quad \tee_{DU}\tr \quad = &\quad - \tee_{DU} \quad \tee_{DU}^{T^+} 
+\end{aligned}
+\end{equation*}
+To yield
+\begin{equation}
+\tee_{DU} \udvec{M}_s^+ \quad = \quad -\boldsymbol{\kappa} \vector{M}_s \quad + \quad \vector{M}_s^+ 
+\end{equation}
+The first row of the left hand side is $\vector{M}_s^+$ $\cdot$ $\ihatpr{i}$, and can be substituted into Eq. (\ref{eqn:beamtorsion1}) to obtain the beam torsion equation as 
+\begin{equation}
+\label{eqn:beamtorsion}
+M_z \kappa_2 \quad - \quad M_y \kappa_3 \quad + \quad M_x^+ \quad + \quad q_x \quad = \quad 0
+\end{equation}
+If the slope of the vertical deflection is an odd multiple of $\frac{\pi}{2}$, the rotation matrix becomes singular and the first and third Euler rotations occur about the same axis. We will assume that this situation will not occur, since the physical configuration corresponding to a 90$^\circ$ slope with respect to the equilibrium position is difficult (if not impossible) to achieve for rotor blades, and for the cases of cable deflection considered. Thus, multiplications and divisions by T$_{11}$ are permissible under these assumptions. Substituting the shear forces given by Eq. (\ref{eqn:beamshears}) in the force balance equation \ref{eqn:beamforcebalance}, we obtain
+\begin{equation}
+\label{eqn:beamflap1}
+\tilde{p}_z \quad + \quad \frac{\partial}{\partial r} \left[ \quad\frac{T_{13}}{T_{11}} \widetilde{S}_x \quad + \quad \left(\frac{\partial \widetilde{M}_y}{\partial r} \quad + \quad \tilde{q}_y \right) \frac{1}{T_{11}} \quad\right] \quad = \quad 0
+\end{equation} 
+\begin{equation}
+\label{eqn:beamlag1}
+\tilde{p}_y \quad + \quad \frac{\partial}{\partial r} \left[ \quad  \frac{T_{12}}{T_{11}} \widetilde{S}_x \quad - \quad \left(\frac{\partial \widetilde{M}_z}{\partial r} \quad + \quad \tilde{q}_z \right) \frac{1}{T_{11}} \quad \right] \quad = \quad 0
+\end{equation} 
+
+At this stage, the governing equations have been formulated in terms of the structural moments about the undeformed axes, which can be obtained from their deformed-frame counterparts using a coordinate transformation. The outstanding quantity that is undetermined is the term $EA e_A \frac{1}{2}(1-x^{+^2})$ in the Z-component of Eqs. (\ref{eqn:StrlMomentDeformed}), which represents the coupling between axial force and ``lag'' bending due to chord-wise offset of the cross-section centroid. (A similar term would exist in the flap bending moment if we had not assumed one axis of symmetry for the cross-section.) The term $\frac{1}{2}(1 - x^{+^2})$ is the axial strain at the elastic axis $\epsilon_{11}$($\eta$ = $\zeta$ = 0), or simply $\epsilon_{11}(0,0)$, which can be obtained through the following manipulations. Integrating the force equilibrium relations Eq. (\ref{eqn:beamforcebalance}), we obtain the structural reaction components along the undeformed axes as 
+\begin{equation}
+\left.
+\begin{aligned}
+\widetilde{S}_x \quad = \quad & - \int_{r}^{R} \tilde{p}_x(s) ds \\
+\widetilde{S}_y \quad = \quad & - \int_{r}^{R} \tilde{p}_y(s) ds \\
+\widetilde{S}_z \quad = \quad & - \int_{r}^{R} \tilde{p}_z(s) ds \qquad \qquad \\
+\end{aligned} 
+\right\}
+\end{equation}
+These components can be expressed in the deformed frame using a coordinate transformation (premultiplying by the \tee$_{DU}$ matrix). The force component along the deformed elastic axis is 
+\begin{equation}
+\label{eqn:SXext}
+S_x \quad = -\left(\spc T_{11} \int_{r}^{R} \tilde{p}_x(s) ds \quad + \quad  T_{12} \int_{r}^{R} \tilde{p}_y(s) ds \quad + \quad T_{13} \int_{r}^{R} \tilde{p}_z(s) ds \spc \right)
+\end{equation}
+The structural force $S_x$ may also be obtained by integrating the axial strain over the cross-section, given by Eqs. (\ref{eqn:SXYZ}) and (\ref{eqn:strains1}) as
+\begin{equation*}
+\begin{aligned}
+S_x \quad = \quad \int \int_{A} [\quad & \frac{1}{2}\eta^2(\kappa_3^2 + \kappa_1^2 - \theta^{+^2}) \quad + \quad \frac{1}{2}\zeta^2 (\kappa_2^2 + \kappa_1^2 - \theta^{+^2}) \quad + \quad \eta \zeta (-\kappa_2 \kappa_3) \\
++ \qquad & \eta (-\kappa_3) + \quad \zeta (\kappa_2) + \epsilon_{11}(0,0) ] \quad dA 
+\end{aligned}
+\end{equation*}
+Using the area moments of inertia to denote the integrals,
+\begin{equation*}
+\begin{aligned}
+S_x \quad = \quad & \frac{1}{2}EI_{\zeta \zeta} (\kappa_3^2 + \kappa_1^2 - \theta^{+^2}) \quad + \quad \frac{1}{2}EI_{\eta \eta} (\kappa_2^2 + \kappa_1^2 - \theta^{+^2})  \\
++& \quad EA \left[e_A (-\kappa_3) + \epsilon_{11}(0,0) \right] \\
+\end{aligned} 
+\end{equation*}
+An order of magnitude analysis similar to Eq. (\ref{eqn:relativemags}) can be performed to isolate the dominant terms (based on an assumption of maximum bending strain) 
+\begin{equation}
+\label{eqn:SXNA}
+S_x \quad = \quad  EA \left[e_A (-\kappa_3) + \epsilon_{11}(0,0) \right]\quad + \quad EJ \left[\theta^+ \phi^+ + \frac{1}{2} \phi^{+^2}\right]
+\end{equation}
+Substituting for $S_x$ from Eq. \ref{eqn:SXext} in Eq. (\ref{eqn:SXNA}), we obtain the force along the elastic axis as 
+\begin{equation}
+\label{eqn:SXfinal}
+\begin{split}
+EA \epsilon_{11}(0,0) \quad = & \quad EA \frac{1}{2}(1 - x^{+^2}) \\
+= & \quad S_x \quad + \quad EA e_A \kappa_3 \quad - \quad EJ \left(\theta^+ \phi^+ \quad + \quad \frac{1}{2} \phi^{+^2}\right)
+\end{split}
+\end{equation}
+Substitute the expression for $\epsilon_{11}(0,0)$ from Eq. (\ref{eqn:SXfinal}) in Eq. (\ref{eqn:StrlMomentDeformed}) to yield an expression for the lag structural moment as 
+\begin{equation}
+\label{eqn:finalStructMz}
+M_z \quad = \quad EI_{z} \kappa_3 \quad - \quad e_A S_x \quad - \quad EB_2^{*} \left(\theta^+ \phi^+ \quad + \quad \frac{1}{2} \phi^{+^2} \right)
+\end{equation}
+Where 
+\begin{equation*}
+I_z \quad = \quad I_{\zeta \zeta} - A e_A^2 \qquad ; \qquad 
+EB_2^{*} \quad = \quad EB_2 - EJ e_A 
+\end{equation*}
+$I_z$ is the lag-wise second moment of area of the cross-section about the \emph{neutral axis}, which is offset a distance $e_A$ ahead of the elastic axis along the $\eta$ coordinate. This completes the structural loads formulation, and all quantities have been expressed in terms of the external loads $\vector{p}$,$\vector{q}$ and the deflections ($v$, $w$, $\phi$). The structural loads at various quadrature points along an element are computed in the routine \textbf{beam\_structural\_loads}. Since the swept tip section is considered rigid, structural loads are zero over that portion of the blade (and beam theory is not strictly valid for the aspect ratios of the blade section outboard of the joint).
+
+\subsubsection{Beam Dynamics : External Loading}
+\label{sec:beamextload}
+Expressions for the external forces $\vector{p}$ and moments $\vector{q}$ per unit span are obtained in this section. The sources of external loading are fluid forces (aero or hydrodynamics), gravity, buoyancy and inertia. A mechanical damper is used to stabilize the rotor lag modes, and introduces point loads at its attachment point on the blade. The contributions to the external loads from each of these components are given in this section.
+
+\subsubsection{Lag Damper Loads}
+The rotor blade used in the present study is attached to the hub using coincident flap and lag hinges, and is fitted with a mechanical lag damper to provide structural damping for the in-plane motions, i.e. the first lag mode. The moments provided by the damper to the rotor blade are computed using a linear spring constant and a tabulated damping coefficient (Ref. \cite{Howlett}). Since the other end of the damper is attached to the airframe, its loads are internal to the entire aircraft.
+\subsubsection{Rotor Blade Boundary Condition}
+\label{sec:rbbc}
+The rotor blades are mounted using a nexus, or \emph{hub}, which rotates about a fixed axis on a shaft that is driven by a gas turbine engine, using a gearbox to reduce RPM and increase torque. Rotor hubs are mounted above the vehicle center of gravity due to safety requirements. Additionally, the rotor shaft is often mounted with a forward tilt with respect to the body. This shaft mount angle is critical for orienting a component the rotor thrust into the wind in forward flight without affecting longitudinal moment balance. Finally, a precone angle is given to the blade spar to reduce the flap bending moments. 
+
+In this analysis, the connections from body to shaft, shaft to hub and hub to blade are assumed to be rigid. The variations of rotor speed due to engine dynamics are assumed to be small and neglected. Therefore, the blade root motions can be obtained using rigid-body kinematics using the helicopter motions, hub offset from vehicle CG, shaft tilt and rotor rotational speed from the states corresponding to the airframe rigid-body motions $\vector{y}_\textrm{RB}$. The position of the rotor hub is
+\begin{equation}
+\label{eqn:bladeroot}
+\aar_\textrm{hub} \quad = \quad 
+\aar\ud{CG} \spc + \spc \pmat{G}\tr \spc \tee_{GB} \spc \begin{Bmatrix} \Delta\textrm{x} \\ \Delta \textrm{y} \\ \Delta \textrm{z} \end{Bmatrix}_\textrm{hub} 
+\end{equation}
+Where $\tee_{GB} = \tee_{BG}\tr$ is the rotation matrix from the earth-fixed axes to the helicopter body axes, obtained from Eq. (\ref{eqn:TBG}). Rotor hub offsets from the vehicle CG are represented by ($\Delta$x, $\Delta$y, $\Delta$z)$_\textrm{hub}$, measured in body-fixed axes. Differentiate Eq. (\ref{eqn:bladeroot}) once with respect to time to obtain the hub velocity with respect to the earth as 
+\begin{equation}
+\label{eqn:bladevel}
+\vector{v}_\textrm{hub} \quad = \quad 
+\vector{v}\ud{CG} \spc + \spc \pmat{G}\tr \spc \dot{\tee}_{GB} \spc 
+\begin{Bmatrix} \Delta\textrm{x} \\ \Delta \textrm{y} \\ \Delta \textrm{z} \end{Bmatrix}_\textrm{hub} 
+\end{equation}
+Traditional analyses operate in the body-fixed axes system, and the effects of angular rotation are usually accounted for using a cross-product $\omega \times \aar_\textrm{hub}$. In the present analysis, the premultiplication by $\dot{\tee}_{GB}$ automatically accounts for these rotations and simultaneously converts the velocities to earth-fixed axes. Differentiate Eq. (\ref{eqn:bladevel}) once with respect to time to obtain the hub acceleration with respect to the earth as
+\begin{equation}
+\label{eqn:bladeacc}
+\vector{a}_\textrm{hub} \quad = \quad 
+\vector{a}\ud{CG} \spc + \spc \pmat{G}\tr \spc \ddot{\tee}_{GB} \spc 
+\begin{Bmatrix} \Delta\textrm{x} \\ \Delta \textrm{y} \\ \Delta \textrm{z} \end{Bmatrix}_\textrm{hub} 
+\end{equation}
+The time derivatives of $\tee_{GB}$ are given in Eqs. (\ref{eqn:Td}) and (\ref{eqn:Tdd}). The final component used in the formulation of beam external loads is the rotation  from the earth-fixed axes ($\ihat{i}\ud{G}$, $\ihat{j}\ud{G}$, $\ihat{k}\ud{G}$, Section \ref{sec:efa}) to the blade undeformed axes ($\ihat{i}$, $\ihat{j}$, $\ihat{k}$, Section \ref{sec:bua}). The coordinate transformation matrix and its time derivatives are given by
+\begin{align}
+\label{eqn:TUG}
+\tee_{UG} \quad = \quad & \tee_{UH}\quad \tee_{HG} \\
+\dot{\tee}_{UG} \quad = \quad & \dot{\tee}_{UH} \quad \tee_{HG} \quad + \quad \spc \tee_{UH} \quad \dot{\tee}_{HG} \notag \\ 
+\ddot{\tee}_{UG} \quad = \quad & \ddot{\tee}_{UH} \quad \tee_{HG} \quad + \spc 2 \spc  \dot{\tee}_{UH} \quad \dot{\tee}_{HG} \quad + \quad \tee_{UH} \quad \ddot{\tee}_{HG} \notag \\
+\textrm{Where} \notag \\
+\tee_{HG} \quad = \quad & \tee_{HB} \quad \tee_{BG} \qquad \qquad \qquad \tee_{UH} \quad = \quad \tee_{UR} \quad \tee_{RH} \notag \\
+\dot{\tee}_{HG} \quad = \quad & \tee_{HB} \quad \dot{\tee}_{BG} \qquad \qquad \qquad \dot{\tee}_{UH} \quad = \quad \tee_{UR} \quad \dot{\tee}_{RH} \notag \\
+\ddot{\tee}_{HG} \quad = \quad & \tee_{HB} \quad \ddot{\tee}_{BG} \qquad \qquad \qquad \ddot{\tee}_{UH} \quad = \quad \tee_{UR} \quad \ddot{\tee}_{RH} \notag
+\end{align}
+\begin{itemize}
+\item The matrix $\tee_{BG}$ represents the rotation from earth-fixed axes to helicopter body axes, given in Eq. (\ref{eqn:TBG}). The time derivatives of rotation matrices are obtained using Eqs. (\ref{eqn:Td}) and (\ref{eqn:Tdd}) by substituting $\phi=\phi\ud{F}$, $\theta=\theta\ud{F}$, $\psi=\psi\ud{F}$, $\dot{\phi}=\dot{\phi}\ud{F}$, $\dot{\theta}=\dot{\theta}\ud{F}$, $\dot{\psi}=\dot{\psi}\ud{F}$, $\ddot{\phi}=\ddot{\phi}\ud{F}$, $\ddot{\theta}=\ddot{\theta}\ud{F}$ and $\ddot{\psi}=\ddot{\psi}\ud{F}$. 
+\item The terms $\tee_{HB}$ and $\tee_{UR}$ represent the rotations from body axes to hub non-rotating axes, and rotating blade unpreconed axes to rotating blade preconed undeformed axes, are time-invariant by definition and given in Eqs. (\ref{eqn:THB}) and (\ref{eqn:TUR}) respectively. 
+\item The matrix $\tee_{RH}$ represents the rotation from the hub non-rotating axes to the blade rotating unpreconed axes, given in Eq. (\ref{eqn:TRH}). The time derivatives of this matrix are obtained using Eqs. (\ref{eqn:Td}) and (\ref{eqn:Tdd}) by substituting $\phi=\theta=\dot{\phi}=\dot{\theta}=\ddot{\phi}=\ddot{\theta}=\ddot{\psi}=0$, $\psi=\psi_j$ and $\dot{\psi}=\Omega\ud{MR}$.
+\end{itemize}
+
+\subsubsection{Inertial Loads}
+\label{sec:inrloads}
+Consider a flexible rotor blade mounted to a hub attachment that is translating and rotating with the helicopter. The accelerations of an arbitrary point ``P'' are obtained and integrated over the cross-sections to yield the sectional loads per unit span. To include the effect of helicopter hub accelerations, the coordinates of ``P'' are written in an earth-fixed reference as
+\begin{equation}
+\label{eqn:re2}
+\aar\ud{P} \quad = \quad \aar_\textrm{hub} \quad + \quad \aar_{ea} \quad + \quad \aar_{cs} 
+\end{equation}
+In Eq. (\ref{eqn:re2}), $\aar_\textrm{hub}$ represents the position of the hub with respect to the earth, given in Eq. (\ref{eqn:bladeroot}) ; $\aar_{ea}$ represents the deformed positions of the elastic axis in the undeformed frame ; $\tee_{GU}$ is the rotation matrix from the undeformed beam axes ($\ihat{i}$, $\ihat{j}$, $\ihat{k}$, Section \ref{sec:bua}) to the inertial axes ($\ihat{i}\ud{G}$, $\ihat{j}\ud{G}$, $\ihat{k}\ud{G}$, Section \ref{sec:efa}) ; \emph{x} is the radial distance of the cross-section from the root before deformation ; ($u$, $v$, $w$) are the displacements of the elastic axis along the undeformed axes ; \tee$_{GD}$ = \tee$_{GU}$ \tee$_{UD}$ is the rotation matrix from the beam deformed axes ($\ihatpr{i}$, $\ihatpr{j}$, $\ihatpr{k}$, Section \ref{sec:bda}) to the earth-fixed axes, given by Eqs. (\ref{eqn:TDU2}) and (\ref{eqn:TUG}) ; $\aar_{cs}$ represents the coordinates of a point in the cross-section with respect to the deformed elastic axis ; and ($\eta$, $\zeta$) are the coordinates of P along the ($\ihatpr{j}$, $\ihatpr{k}$) axes. 
+\begin{align*}
+\aar_{ea} \quad = \quad & \pmat{G}\tr \spc \tee_{GU} \spc 
+\begin{Bmatrix} x+u \\ v \\ w \end{Bmatrix} \\
+\aar_{cs} \quad = \quad & \pmat{G}\tr \spc \tee_{GD} \spc \begin{Bmatrix} 0 \\ \eta \\ \zeta \end{Bmatrix} 
+\end{align*}
+Differentiate Eq. (\ref{eqn:re2}) once with respect to time, to obtain
+\begin{equation}
+\label{eqn:ve1}
+\vector{v}_p \quad = \quad \vector{v}_\textrm{hub} \quad + \quad \dot{\aar}_\textrm{ea} \quad + \quad \dot{\aar}_\textrm{cs} 
+\end{equation}
+Where $\vector{v}_\textrm{hub}$ is given in Eq. (\ref{eqn:bladevel}), and 
+\begin{align*}
+\dot{\aar}_\textrm{ea} \quad = \quad & \pmat{G}\tr \spc \left[ \spc \tee_{GU}  
+\begin{Bmatrix} \dot{u} \\ \dot{v} \\ \dot{w} \end{Bmatrix} \quad + \quad \dot{\tee}_{GU} \begin{Bmatrix} x+u \\ v \\ w \end{Bmatrix} \spc \right] \\
+\dot{\aar}_{cs} \quad = \quad & \pmat{G}\tr \spc \left[ \spc \dot{\tee}_{GD} \begin{Bmatrix} 0 \\ \eta \\ \zeta  \end{Bmatrix} \spc \right]
+\end{align*}
+Differentiate Eq. (\ref{eqn:ve1}) once with respect to time, to obtain
+\begin{equation}
+\label{eqn:ac1}
+\vector{a}_p \quad = \quad \vector{a}_\textrm{hub} \quad + \quad \ddot{\aar}_\textrm{ea} \quad + \quad \ddot{\aar}_\textrm{cs} 
+\end{equation}
+Where $\vector{a}_\textrm{hub}$ is given by Eq. (\ref{eqn:bladeacc}), and 
+\begin{align*}
+\ddot{\aar}_\textrm{ea} \quad = \quad & \pmat{G}\tr \spc \left[ \spc \tee_{GU}  
+\begin{Bmatrix} \ddot{u} \\ \ddot{v} \\ \ddot{w} \end{Bmatrix} \quad + \quad 2 \dot{\tee}_{GU} \begin{Bmatrix} \dot{u} \\ \dot{v} \\ \dot{w} \end{Bmatrix} \quad + \quad \ddot{\tee}_{GU} \begin{Bmatrix} x+u \\ v \\ w \end{Bmatrix} \spc \right]\\
+\ddot{\aar}_\textrm{cs} \quad = \quad & \pmat{G}\tr \spc \ddot{\tee}_{GD} \spc \begin{Bmatrix} 0 \\ \eta \\ \zeta \end{Bmatrix}
+\end{align*}
+The inertial force per unit span is obtained by integrating the acceleration over the cross-section area as
+\begin{equation}
+\vector{F}^+_I \quad = \quad -\int \int_A \quad \vector{a}_p \quad \rho_\textrm{b} dA \qquad 
+\end{equation}
+Here, $\rho_\textrm{b}$ represents the mass density of the rotor blade material. Since the beam equations are formulated in the undeformed reference frame, the accelerations need to be expressed in that frame. The components of the inertial force per unit span along the undeformed beam axes are
+\begin{equation}
+\label{eqn:inF}
+\begin{aligned}
+\begin{Bmatrix} \tilde{p}_x \\ \tilde{p}_y \\ \tilde{p}_z \end{Bmatrix}_I \quad =  \quad &-m \tee_{UG} \left[ \quad 
+\begin{Bmatrix} \ddot{x}_0 \\ \ddot{y}_0 \\ \ddot{z}_0 \end{Bmatrix} \quad + \quad 
+\begin{Bmatrix} \ddot{x}_\textrm{ea} \\ \ \ddot{y}_\textrm{ea} \\ \ddot{z}_\textrm{ea} \end{Bmatrix} \quad + \quad \ddot{\tee}_{GD} 
+\begin{Bmatrix} 0 \\ e_A \\ 0 \end{Bmatrix} \quad \right]
+\end{aligned}
+\end{equation}
+The term $m$ represents the mass per unit span of the rotor blade at the spanwise position of interest. The acceleration components $\vector{a}_{hub}$ and $\ddot{\aar}_\textrm{ea}$ are functions of the root-end motion, orientation of the undeformed frame with respect to the inertial reference and motion of the elastic axis, while $\ddot{\aar}_\textrm{cs}$ depends on the coordinates ($\eta$, $\zeta$) of a point in the cross-section. For convenience, the first two acceleration terms are handled together, while the third term $\aar_\textrm{cs}$ is treated separately. Using a process similar to that followed for inertial forces, the moment per unit span about the deformed beam axes exerted by inertial forces on a cross-section are 
+\begin{align*}
+\vector{M}_I^+ \quad = \quad & \vector{M}_{I1}^+ \quad + \quad \vector{M}_{I2}^+ \\
+\textrm{Where} \qquad \qquad \qquad & \\
+\vector{M}_{I1}^+ \quad = \quad &- \int \int_A \quad (\eta \ihatpr{j} + \zeta \ihatpr{k}) \spc \times \spc (\vector{a}_\textrm{hub} + \vector{a}_\textrm{ea}) \quad \rho_\textrm{b} dA \qquad \qquad \\
+\vector{M}_{I2}^+ \quad = \quad &- \int \int_A \quad (\eta \ihatpr{j} + \zeta \ihatpr{k}) \spc \times \spc \vector{a}_\textrm{cs} \quad \rho_\textrm{b} dA  \qquad \qquad 
+\end{align*}
+The first integral $\vector{M}_{I1}^+$ contains accelerations that represent the motions of the root and elastic axis, which are independent of the cross-section coordinates ($\eta$, $\zeta$). The components of $\vector{M}_{I1}$ along earth-fixed axes are 
+\begin{align*}
+\begin{Bmatrix} M_x^+ \\ M_y^+ \\ M_z^+ \end{Bmatrix}_{I1} \quad = & \quad -\int \int_A \quad \begin{Bmatrix} r_y a_{z1} - r_z a_{y1} \\ r_z a_{x1} - r_x a_{z1} \\ r_x a_{y1} - r_y a_{x1} \end{Bmatrix} \rho_\textrm{b} dA \\
+\textrm{Where} \qquad \qquad & \\
+\begin{Bmatrix} r_x \\ r_y \\ r_z \end{Bmatrix} \quad = &\qquad \begin{Bmatrix}  T^*_{12} \eta + T^*_{13} \zeta \\
+T^*_{22} \eta + T^*_{23} \zeta \\ T^*_{32} \eta + T^*_{33} \zeta \\ \end{Bmatrix} \qquad \qquad \qquad \qquad \qquad \qquad \quad \\
+\begin{Bmatrix} a_{x1} \\ a_{y1} \\ a_{z1} \end{Bmatrix} \quad = & \quad (\vector{a}_\textrm{hub} + \ddot{\aar}_\textrm{ea}) \cdot \begin{Bmatrix}\ihat{i}\ud{G} \\ \ihat{j}\ud{G} \\ \ihat{k}\ud{G} \end{Bmatrix} 
+\end{align*}
+\tee$^*_{ij}$ is the element in row $i$ and column $j$ of the matrix \tee$_{GD}$. Assuming that the cross-section has a symmetric mass distribution about the $\eta$ axis, the integrals can be reduced to 
+\begin{equation}
+\label{eqn:inertiamom1}
+\begin{Bmatrix} M_x^+ \\ M_y^+ \\ M_z^+ \end{Bmatrix}_{I1} \quad = \quad m e_A \begin{Bmatrix} a_{y1} T^*_{32} - a_{z1} T^*_{22} \\ a_{z1} T^*_{12} - a_{x1} T^*_{32} \\ a_{x1} T^*_{22} - a_{y1} T^*_{12} \end{Bmatrix} \qquad \qquad \qquad \qquad \qquad \qquad 
+\end{equation}
+Where $m$ $e_A$ = $\int \int_A \spc \eta \spc \rho_\textrm{b} \spc dA $. The components of $\vector{M}_{I2}$ along earth-fixed axes are 
+\begin{equation}
+\begin{Bmatrix} M_x^+ \\ M_y^+ \\ M_z^+ \end{Bmatrix}_{I2} \quad = \quad -\int \int_A \quad \begin{Bmatrix} r_y a_{z2} - r_z a_{y2} \\ r_z a_{x2} - r_x a_{z2} \\ r_x a_{y2} - r_y a_{x2} \end{Bmatrix} \rho_\textrm{b} dA \qquad \qquad \qquad \qquad \qquad \\
+\end{equation}
+Where 
+\begin{equation}
+\begin{Bmatrix} a_{x2} \\ a_{y2} \\ a_{z2} \end{Bmatrix} \qquad = \qquad \begin{Bmatrix} \ddot{T}^*_{12} \eta + \ddot{T}^*_{13} \zeta  \\ \ddot{T}^*_{22} \eta + \ddot{T}^*_{23} \zeta  \\ \ddot{T}^*_{32} \eta + \ddot{T}^*_{33} \zeta  \end{Bmatrix} \quad \qquad \qquad \qquad \qquad \qquad \qquad 
+\end{equation}
+$\ddot{T}^*_{ij}$ is the element in row $i$ and column $j$ in the matrix $\ddot{\tee}_{GD}$. Expanding the expression for the X-component, we obtain
+\begin{equation*}
+\begin{aligned}
+(M_x^+)_{I2} \quad = &\quad -\int \int_A \quad \left(r_y a_{z2} - r_z a_{y2} \right) dA \\
+= &\quad -\int \int_A \quad (T^*_{22} \eta \quad + \quad T^*_{23} \zeta)\quad (\ddot{T}^*_{32} \eta \quad + \quad \ddot{T}^*_{33} \zeta) \quad \rho_\textrm{b} dA \\ 
+&\quad+\int \int_A \quad (T^*_{32} \eta \quad + \quad T^*_{33} \zeta)\quad (\ddot{T}^*_{22} \eta \quad + \quad \ddot{T}^*_{23} \zeta) \quad \rho_\textrm{b} dA 
+\end{aligned}
+\end{equation*}
+The integrals over the cross-section can be represented using mass moments of inertia, and the expression reduces to 
+\begin{equation*}
+(M_x^+)_{I2} \quad =\quad m k_{m2}^2 \left( T_{32}^* \ddot{T}_{22}^* - T_{22}^* \ddot{T}_{32}^* \right) \quad + \quad m k_{m3}^2 \left( T_{33}^* \ddot{T}_{23}^* - T_{23}^* \ddot{T}_{33}^* \right)
+\end{equation*}
+Cross-section symmetry about the $\ihatpr{j}$ axis has been used to eliminate the integrals in odd powers of $\zeta$, and the non-zero integrals have been represented using 
+\[
+m k_{m2}^2 \quad = \quad \int \int_A \quad \eta^2 \quad \rho_\textrm{b} dA  \qquad \qquad \qquad m k_{m3}^2 \quad = \quad \int \int_A \quad \zeta^2 \quad \rho_\textrm{b} dA 
+\]
+The terms $k_{m2}$ and $k_{m3}$ are the radii of gyration of the cross-section about the $\ihatpr{k}$ and $\ihatpr{j}$ axes respectively. Working similarly, the components of $\vector{M}_{I2}$ along $\ihat{j}\ud{G}$ and $\ihat{k}\ud{G}$ are obtained. The three components (along earth-fixed axes) are 
+\begin{equation}
+\label{eqn:inertiamom2}
+\begin{aligned}
+(M_x^+)_{I2} \quad =\quad &m k_{m2}^2 \left( T_{32}^* \ddot{T}_{22}^* - T_{22}^* \ddot{T}_{32}^* \right) \quad + \quad m k_{m3}^2 \left( T_{33}^* \ddot{T}_{23}^* - T_{23}^* \ddot{T}_{33}^* \right) \\
+(M_y^+)_{I2} \quad =\quad &m k_{m2}^2 \left( T_{12}^* \ddot{T}_{32}^* - T_{32}^* \ddot{T}_{12}^* \right) \quad + \quad m k_{m3}^2 \left( T_{13}^* \ddot{T}_{33}^* - T_{33}^* \ddot{T}_{13}^* \right) \\
+(M_z^+)_{I2} \quad =\quad &m k_{m2}^2 \left( T_{22}^* \ddot{T}_{12}^* - T_{12}^* \ddot{T}_{22}^* \right) \quad + \quad m k_{m3}^2 \left( T_{23}^* \ddot{T}_{13}^* - T_{13}^* \ddot{T}_{23}^* \right) 
+\end{aligned}
+\end{equation}
+The components of inertial moment per unit span about the undeformed beam axes are obtained by using a coordinate transformation on Eqs. (\ref{eqn:inertiamom1}) and (\ref{eqn:inertiamom2}), yielding
+\begin{equation}
+\label{eqn:inertialmom}
+\begin{Bmatrix} \tilde{q}_x \\\tilde{q}_y \\ \tilde{q}_z \end{Bmatrix}_I \quad = \quad \tee_{UG} \left[ \quad \begin{Bmatrix} M_x^+ \\ M_y^+ \\ M_z^+ \end{Bmatrix}_{I1} \quad + \quad \ \begin{Bmatrix} M_x^+ \\ M_y^+ \\ M_z^+ \end{Bmatrix}_{I2} \quad \right]
+\end{equation}
+
+\subsubsection{Gravity and Buoyancy}
+The effects of gravity and buoyancy are computed simultaneously, since these forces act along the $\ihat{k}\ud{G}$ axis but in opposite directions. The gravitational acceleration at a beam section is 
+\begin{equation}
+\vector{a}_g \quad = \quad g \spc  \ihat{k}\ud{G} 
+\end{equation}
+
+Archimedes' principle states that the buoyancy force (upward) exerted by a fluid on a partially or completely immersed object is equal to the weight of the fluid displaced by that object. Denoting the fluid density by $\rho_f$ and the material density of the beam by $\rho_\textrm{b}$, the buoyancy acceleration is 
+\begin{equation}
+\vector{a}_b \quad = \quad -\frac{\rho_f}{\rho_\textrm{b}} g \spc  \ihat{k}\ud{G}
+\end{equation}
+
+Following a procedure similar to that adopted for inertial loads, the cumulative effects of gravity and buoyancy forces and moments per unit span are obtained 
+\begin{align}
+\begin{Bmatrix} \tilde{p}_x \\ \tilde{p}_y \\ \tilde{p}_z \end{Bmatrix}_{env} \quad = \quad &\tee_{UG} \begin{Bmatrix} 0 \\ 0 \\ 1\end{Bmatrix} \quad m g \left(1 - \frac{\rho_f}{\rho_\textrm{b}}\right) \qquad \qquad\\ 
+\begin{Bmatrix} \tilde{q}_x \\ \tilde{q}_y \\ \tilde{q}_z \end{Bmatrix}_{env} \quad = \quad &\tee_{UG} \begin{Bmatrix} T_{22}^* \\ -T_{12}^* \\ 0 \end{Bmatrix} m g \left(1 - \frac{\rho_f}{\rho_\textrm{b}} \right) e_A \qquad \qquad
+\end{align}
+The buoyancy and gravity forces create moments about the elastic axis of a beam when the centroid has an offset $e_A$. This can be thought of physically as the total force on the cross-section acting at the mass centroid, which then produces a moment about the elastic axis. Both inertial and gravitational loads are computed in the subroutine \textbf{beam\_inertial\_loads}.
+
+\subsubsection{Aerodynamic Loads}
+\label{sec:aerloads}
+The aerodynamic forces acting on a rotor blade are obtained from the motions of the structure relative to the fluid. This relative motion may be a result of free-stream flow over a non-translating object (e.g. wind-tunnel) or movement of an object in space in still air (free flight) or a combination of both (flight in windy conditions). From Eq. (\ref{eqn:ve1}), the absolute velocity of a point in a cross-section of the beam can be resolved into components along the deformed beam axes as 
+\begin{equation*}
+\begin{aligned}
+\begin{Bmatrix} v_1 \\ v_2 \\ v_3 \end{Bmatrix} \quad = \qquad & \tee_{DG} \spc \begin{Bmatrix} \dot{x}_0 \\ \dot{y}_0 \\ \dot{z}_0 \end{Bmatrix} \spc + \spc \tee_{DU} \spc \begin{Bmatrix} \dot{u} \\ \dot{v} \\ \dot{w} \end{Bmatrix} \spc + \spc \tee_{DG} \spc \dot{\tee}_{GU} \spc \begin{Bmatrix} x+u \\ v \\ w \end{Bmatrix} \\
++ \quad & \tee_{DG} \spc \dot{\tee}_{GD} \spc \begin{Bmatrix} 0 \\ \eta \\ \zeta \end{Bmatrix} 
+\end{aligned}
+\end{equation*}
+The velocity of air relative to the structure is equal in magnitude and opposite in direction to the velocity of the structure relative to the fluid. In the case of a rotor blade, the induced inflow must be accounted for in computing the velocity of the air relative to the blade sections. The velocity components for a counter-clockwise turning rotor are shown in Fig. \ref{fig:bladevel}, given by 
+\begin{align*}
+\begin{Bmatrix} U_{_R} \\ U_{_T} \\ U_{_P} \end{Bmatrix} \quad = \quad & \begin{Bmatrix} -v_1 \\ v_2 \\ -v_3 \end{Bmatrix} \spc + \spc \begin{Bmatrix} V_{xi} \\-V_{yi} \\ V_{zi} \end{Bmatrix} \\
+\begin{Bmatrix} V_{xi} \\ V_{yi} \\ V_{zi} \end{Bmatrix} \quad = \quad & \tee_{DH} \spc \begin{Bmatrix} \lambda_{xi} \\ \lambda_{yi} \\ \lambda_{zi} \end{Bmatrix}
+\end{align*}
+$U_{_T}$ is the tangential velocity along the airfoil reference line, $U_{_P}$ is the ``upwash'' velocity for the airfoil section, $U_{_R}$ is the spanwise flow velocity, defined positive outward as shown in Fig. \ref{fig:bladevel}. ($V_{xi}$, $V_{yi}$, $V_{zi}$) are the induced velocity components in the deformed frame, and the inflow components (non-dimensionalized by tip speed) along the hub non-rotating axes are ($\lambda_{xi}$, $\lambda_{yi}$, $\lambda_{zi}$). $\tee_{DH}=\tee_{DU} \spc \tee_{UR} \spc \tee_{RH}$ is the transformation matrix from the hub non-rotating axes to the blade deformed frame, obtained from Eqs. (\ref{eqn:TDU2}), (\ref{eqn:TUR}) and (\ref{eqn:TRH}). 
+\begin{Figure}
+ \centering
+ \includegraphics[width=0.7\linewidth]{./Schematics/Slide12.png}
+ \vspace{-0.5cm}
+ \captionof{figure}{Velocity Components in Deformed Axes}
+ \label{fig:bladevel}
+\end{Figure}
+\subsection*{\textbf{Fluid Forces on an Airfoil Section}}
+Main rotor blades are composed of airfoil cross-sections. These beam sections operate in a three-dimensional flow environment when the flow velocity has a component normal to the cross-section. For rotor blades, flow along the longitudinal direction is often referred to as ``radial flow''. The presence of a flow velocity component along the elastic axis implies that the resultant velocity vector is not contained in the same plane as the airfoil cross-sections, as shown in Fig. \ref{fig:radialflow}. 
+\begin{Figure}
+ \centering
+ \includegraphics[width=0.65\linewidth]{./Schematics/Slide13.png}
+ \vspace{-0.5cm}
+ \captionof{figure}{Blade Airfoil Section in Radial Flow}
+ \label{fig:radialflow}
+\end{Figure}
+\vspace{0.5cm}
+The angle of attack of the section in a plane containing the resultant velocity is 
+\begin{equation}
+\alpha \quad = \quad \tan^{-1} \frac{U_{_P}}{\sqrt{U_{_T}^2 + U_{_R}^2}} 
+\end{equation}
+The skew angle $\gamma_{_\textrm{I}}$ that occurs due to radial flow is defined as the angle between the components $U_T$ and $U_R$, given by 
+\[\gamma_{_\textrm{I}} \quad = \quad \tan^{-1}\frac{U_{_R}}{U_{_T}}  \]
+Empirical corrections are implemented as given in Ref. \cite{Johnson} to compute the lift, drag and moment coefficients in yawed (radial) flow as
+\begin{equation}
+\begin{aligned}
+\frac{dL}{dr} \quad = \quad & \frac{d L_{_C}}{dr} \quad + \quad \frac{d L_{_{NC}}}{dr} \\
+\frac{dD}{dr} \quad = \quad & \frac{1}{2} \spc \rho \spc V_\infty^2 \spc c \spc C_d(\alpha,M) \\
+\frac{dM_{_A}}{dr} \quad = \quad & \frac{d M_{_C}}{dr} \quad + \frac{d M_{_{NC}}}{dr} \\ 
+\end{aligned}
+\end{equation}
+$V_\infty$ is the free-stream velocity magnitude at the elastic axis, given by 
+\[V_\infty \quad = \quad \sqrt{U_{_T}^2+U_{_P}^2+U_{_R}^2} \]
+$L_{_C}^+$ is the lift per unit span from circulatory forces (Ref. \cite{Leishman1}) that acts at the aerodynamic center, obtained from the angle of attack at three-quarter chord as 
+\begin{align*}
+L_{_C}^+ \quad = \quad &\frac{1}{2} \spc \rho \spc V_\infty^2 \spc c \spc C_{\ell}(\alpha \cos \gamma_{_\textrm{I}},M) \qquad \textrm{at aerodynamic center} \\
+\textrm{The non-circulatory component } & \textrm{of lift distribution (Ref. \cite{Leishman1}) is given by} \\
+L_{_{NC}}^+ \quad = \quad & L_2^+ \quad + \quad L_3^+ \qquad \qquad \textrm{Where} \\
+L_2^+ \quad = \quad &\frac{\pi}{4} \spc \rho \spc c^2 \spc \ddot{h}\biggr\rvert_\textrm{0.5 c} \quad \qquad \qquad \qquad \quad \textrm{at mid-chord} \\
+L_3^+ \quad = \quad & \frac{\pi}{4} \spc \rho \spc c^2 \spc V_\infty \spc \dot{\alpha} \qquad \qquad \qquad \qquad \textrm{at 3/4 chord} 
+\end{align*}
+$\ddot{h}\biggr\rvert_\textrm{0.5 c}$ is the plunge acceleration at mid-chord. The aerodynamic moment per unit span about the elastic axis due to circulatory forces is
+\[M_{_C}^+ \quad = \quad \frac{1}{2} \spc  \rho \spc V_\infty^2 \spc c^2 \spc C_m(\alpha \cos \gamma_{_\textrm{I}},M) \quad + \quad x_{\textrm{ac}} L_{_C}^+ \quad - \quad \frac{\pi}{16} \spc \dot{\alpha} \spc \rho \spc V_\infty \spc c^3 \]
+$x_\textrm{ac}$ is the chordwise offset of the aerodynamic center from the elastic axis, positive towards the leading edge. The non-circulatory component of pitching moment distribution about the elastic axis is
+\begin{equation}
+M_{_{NC}}^+ \quad = \quad L_2^+ x_{\textrm{mc}} \quad + \quad L_3^+ x_{\textrm{0.75c}} \quad - \quad \frac{\pi \rho c^4}{128} \ddot{\alpha}
+\end{equation}
+($x_{\textrm{mc}}$, $x_{\textrm{0.75c}}$) are the locations of the mid-chord and three-quarter chord points, respectively, with respect the the elastic axis and are positive when these locations are between the leading edge and the elastic axis. The last term in the non-circulatory moments is dropped, since its magnitude is small compared to the quasi-steady contributions for rotor blades in the frequency range of interest ($\omega \leq$ 10 rad/s). The terms $C_\ell$, $C_d$ and $C_m$ are the airfoil lift, drag and moment coefficients obtained from experiment-based tables. The force components in the beam deformed axes are 
+\begin{equation}
+\begin{aligned}
+\begin{Bmatrix} p_x \\ p_y \\ p_z \end{Bmatrix}_{\textrm{aero}} \quad = \quad & \frac{1}{V_\infty} \quad \begin{Bmatrix} \spc  D^+ U_{_R} \quad - \quad L^+ U_{_P} \sin \gamma_{_\textrm{I}} \quad \\  -D^+ U_{_T} \quad + \quad L^+ U_{_P} \cos \gamma_{_\textrm{I}} \quad \\ \textrm{  } D^+ U_{_P} \quad + \quad L^+ \sqrt{U_{_T}^2 + U_{_R}^2} \end{Bmatrix}
+\end{aligned}
+\end{equation}
+\begin{equation}
+\begin{aligned}
+\begin{Bmatrix} q_x \\ q_y \\ q_z \end{Bmatrix}_{\textrm{aero}} \quad = \quad & \qquad \spc \begin{Bmatrix} M_{_A}^+ \cos \gamma_{_\textrm{I}} \\ M_{_A}^+ \sin \gamma_{_\textrm{I}} \\ 0 \end{Bmatrix} 
+\end{aligned}
+\end{equation}
+These loads are converted to the undeformed frame using the \tee$_{UD}$ rotation matrix, obtained from Eq. (\ref{eqn:TDU2}), to yield 
+\begin{align}
+\label{eqn:aeroF}
+\begin{Bmatrix} \tilde{p}_x \\ \tilde{p}_y \\ \tilde{p}_z \end{Bmatrix}_{\textrm{aero}} \quad = \quad & \tee_{UD} \begin{Bmatrix} p_x \\ p_y \\ p_z \end{Bmatrix}_{\textrm{aero}} \\
+\label{eqn:aeroM}
+\begin{Bmatrix} \tilde{q}_x \\ \tilde{q}_y \\ \tilde{q}_z \end{Bmatrix}_{\textrm{aero}} \quad = \quad & \tee_{UD} \begin{Bmatrix} q_x \\ q_y \\ q_z \end{Bmatrix}_{\textrm{aero}}
+\end{align}
+The sectional aerodynamic loads are computed in \textbf{beam\_aero\_loads}, and table look-up is performed by \textbf{rotor\_section\_airloads}.
+
+\subsubsection{Hub Loads}
+\label{sec:hubloads}
+The forces and moments transmitted to the hub are obtained by integrating the loads along the span and summing the contributions from each of the blades. The force components along the rotating undeformed axes from the $j^\textrm{th}$ blade are 
+\begin{align*}
+X\ud{R}(j) \quad = \quad &\spc \int_0^R \spc  \tilde{p}_x \spc dr \\
+Y\ud{R}(j) \quad = \quad &\spc \int_0^R \spc  \tilde{p}_y \spc dr \\
+Z\ud{R}(j) \quad = \quad &\spc \int_0^R \spc  \tilde{p}_z \spc dr 
+\end{align*}
+Where $\tilde{p}_x, \tilde{p}_y, \tilde{p}_z$ represent the load components per unit span along the rotating undeformed blade axes, containing the sum of inertial, aerodynamic, gravitational and buoyancy loads given in Eqs. (\ref{eqn:inF}) and (\ref{eqn:aeroF}). The moment components along the rotating undeformed axes from the $j^\textrm{th}$ blade are 
+\begin{align*}
+L\ud{R}(j) \quad = \quad &\spc \int_0^R \spc \left[ \tilde{q}_x \spc + \spc v \spc \tilde{p}_z \spc - \spc w \spc \tilde{p}_y \right] \spc dr \\
+M\ud{R}(j) \quad = \quad &\spc \int_0^R \spc \left[ \tilde{q}_y \spc + \spc w \spc \tilde{p}_x \spc - \spc (x+u) \spc \tilde{p}_z \right] \spc dr \\
+N\ud{R}(j) \quad = \quad &\spc \int_0^R \spc \left[ \tilde{q}_z \spc + \spc (x+u) \spc \tilde{p}_y \spc - \spc v \spc \tilde{p}_x \right] \spc dr 
+\end{align*}
+Where $\tilde{q}_x$, $\tilde{q}_y$, $\tilde{q}_z$ represent the moment components per unit span along the rotating undeformed blade axes, containing the sum of inertial and aerodynamic loads given in Eqs. (\ref{eqn:inertialmom}) and (\ref{eqn:aeroM}). The hub loads are obtained by resolving the blade loads along the hub non-rotating axes and summing the contributions from individual blades. The hub force and moment components are 
+\begin{align*}
+\begin{Bmatrix} X\ud{NR} \\ Y\ud{NR} \\ Z\ud{NR} \end{Bmatrix} \quad = \quad & \sum_{j=1}^{N_b} \spc \tee_{RH}\tr \spc \tee_{UR}\tr \spc \begin{Bmatrix} F\ud{XR} \\ F\ud{YR} \\ F\ud{ZR} \end{Bmatrix}  \\
+\begin{Bmatrix} L\ud{NR} \\ M\ud{NR} \\ N\ud{NR} \end{Bmatrix} \quad = \quad & \sum_{j=1}^{N_b} \spc \tee_{RH}\tr \spc \tee_{UR}\tr \spc \begin{Bmatrix} M\ud{XR} \\ M\ud{YR} \\ M\ud{ZR} \end{Bmatrix} 
+\end{align*}
+Where the matrices $\tee_{RH}\tr$ and $\tee_{UR}\tr$ are obtained from Eqs. (\ref{eqn:TRH}) and (\ref{eqn:TUR}), and the azimuth angle of the $j^\textrm{th}$ blade is $\displaystyle \psi_j \quad = \quad \psi_1 \spc + \spc \frac{2\pi}{N_b}(j-1)$. Finally, the hub loads are converted to the helicopter body axes using the transformation matrix $\tee_{BH} = \tee_{HB}\tr$ from Eq. (\ref{eqn:THB}), to yield the contributions from the main rotor to the vehicle force and moment equilibrium Eqs. (\ref{eqn:bodyF1}) - (\ref{eqn:bodyM3}) as 
+\begin{align}
+\label{eqn:XYZMR}
+\begin{Bmatrix} X\ud{MR} \\ Y\ud{MR} \\ Z\ud{MR} \end{Bmatrix} \quad = \quad &\tee_{BH} \spc \begin{Bmatrix} X\ud{NR} \\ Y\ud{NR} \\ Z\ud{NR} \end{Bmatrix} \\
+\label{eqn:LMNMR}
+\begin{Bmatrix} L\ud{MR} \\ M\ud{MR} \\ N\ud{MR} \end{Bmatrix} \quad = \quad &\tee_{BH} \spc \begin{Bmatrix} L\ud{NR} \\ M\ud{NR} \\ N\ud{NR} \end{Bmatrix} \spc + \spc \begin{Bmatrix} \Delta \textrm{y}_\textrm{hub} \spc Z\ud{MR} \spc - \spc \Delta \textrm{z}_\textrm{hub} \spc Y\ud{MR} \\ \Delta \textrm{z}_\textrm{hub} \spc X\ud{MR} \spc - \spc \Delta \textrm{x}_\textrm{hub} \spc Z\ud{MR} \\ \Delta \textrm{x}_\textrm{hub} \spc Y\ud{MR} \spc - \spc \Delta \textrm{y}_\textrm{hub} \spc X\ud{MR} \end{Bmatrix}
+\end{align}
+The summation of blade loads is performed in the routine \textbf{RotorDynamics}, outside of an OPENMP parallelization loop over individual blades.
+\subsubsection{Approximate Solution and the Galerkin Method}
+\label{sec:galerkin}
+Equations \ref{eqn:beamtorsion}, \ref{eqn:beamflap1} and \ref{eqn:beamlag1} are nonlinear \emph{Partial Differential Equations}, since the non-structural (external) loads $\vector{p}$ and $\vector{q}$ include inertial accelerations and fluid forces that depend on the time derivatives of $v$, $w$ and $\phi$. Galerkin's method of weighted residuals is used to transform these equations into a system of \emph{Ordinary Differential Equations} to reduce the computational cost for obtaining a solution. As a result, the beam equations are rendered compatible to use in a state-space formulation (system of coupled ODEs). The solutions of these ODEs are called \emph{weak} solutions, since they satisfy the original PDEs in an \emph{average} sense instead of at every point along the beam. The problem of beam bending and torsion is solved using separation of variables, and the deflections can be parameterized using spatial and temporally-varying components as 
+\begin{align*}
+v \quad    = \quad & \sum_{i=1}^{N_v} \quad q_{v,i} \gamma_{v,i} \\
+w \quad    = \quad & \sum_{i=1}^{N_w} \quad q_{w,i} \gamma_{w,i} \\
+\phi \quad = \quad & \sum_{i=1}^{N_\phi} \quad q_{\phi,i} \gamma_{\phi} 
+\end{align*}
+$\gamma_{v,i}$, $\gamma_{w,i}$ and $\gamma_{\phi,i}$ are the trial functions that depend on the span-wise position \emph{r}, and $q_{v,i}$, $q_{w,i}$, $q_{\phi,i}$ are the trial function coefficients that depend only on time. Let the original PDEs in Eqs. (\ref{eqn:beamtorsion}) - (\ref{eqn:beamlag1}) be represented by 
+\begin{eqnarray*}
+f_\phi(v,w,\phi) \quad = \quad 0 \\
+f_\textrm{w}(v,w,\phi) \quad = \quad 0 \\
+f_\textrm{v}(v,w,\phi) \quad = \quad 0
+\end{eqnarray*}
+Trial functions that are admissible for each equation are used to obtain the weighed residuals, and the problem of solving the PDE is converted to that of finding the coefficients $q_{v,i}$, $q_{w,i}$ and $q_{\phi,i}$ such that 
+\begin{equation}
+\left.
+\begin{aligned}
+\int_{0}^{R} \quad f_\phi(v,w,\phi) \gamma_{v,i} \quad dr \quad = \quad 0 \qquad \qquad \qquad\\
+\int_{0}^{R} \quad f_\textrm{w}(v,w,\phi) \gamma_{w,i} \quad dr \quad = \quad 0 \qquad \qquad \qquad\\
+\int_{0}^{R} \quad f_\textrm{v}(v,w,\phi) \gamma_{\phi,i} \quad dr \quad = \quad 0 \qquad \qquad \qquad\\
+\end{aligned}
+\right\}
+\end{equation}
+
+Consider the elastic twist equation \ref{eqn:beamtorsion}. A weak solution must satisfy 
+\begin{equation}
+\int_{0}^{R} \quad \left(M_z \kappa_2 - M_y \kappa_3 + M_x^+ + q_x  \right) \gamma_{\phi,i} dr \quad = \quad \epsilon_{\phi,i} \quad = \quad 0
+\end{equation}
+
+For practical purposes, we will further relax the condition that the residuals $\epsilon_{\phi,i}$ be exactly zero. Instead, the weak solutions are assumed to be obtained when the residuals decrease (in magnitude) below a specified threshold $\delta_0$. This threshold is set to a small number relative to the magnitudes of the terms in the original PDE. 
+
+The numerical values of the structural moments can be computed from the elastic deflections ($v$, $w$, $\phi$) and used without further manipulation to compute the residuals of the modified PDEs. However, terms involving spatial derivatives (e.g. $M_x^+$) needs to be handled differently. When lower-order polynomial trial functions are used, repeated differentiation results in loss of information and erroneous computation of the spatial gradient for structural loads. To avoid these errors, the residuals of the modified PDEs are computed using regular span-wise integration for terms that are ``directly'' available, and using integration by parts for the derivatives with respect to \emph{r}. Following this approach,
+\begin{align*}
+%\label{eqn:beamres}
+\epsilon_{\phi,i} \quad = \quad &\int_{0}^{R} \left[\quad \left(M_z \kappa_2 - M_y \kappa_3 +q_x  \right) \gamma_{\phi,i} \quad - \quad M_x \gamma_{\phi,i}^+ \quad\right] dr \\
+& \qquad + \quad M_x \gamma_{\phi,i}\biggr\rvert_{0}^{R} \\
+\quad &\\
+\epsilon_{w,i} \quad = \quad & \int_{0}^{R} \left[ \tilde{p}_z \gamma_{w,i} \quad - \quad \left(\frac{T_{13} \widetilde{S}_x + \tilde{q}_y}{T_{11}}\right) \gamma_{w,i}^+ \quad + \quad \left(\frac{\gamma_{w,i}^+}{T_{11}}\right)^+ \widetilde{M}_y \right] dr \\ 
+& +\quad \frac{T_{13}\widetilde{S}_x + \tilde{q}_y+ \widetilde{M}_y^+}{T_{11}} \gamma_{w,i}\biggr\rvert_{0}^{R} \quad - \quad \frac{\gamma_{w,i}^+}{T_{11}} \widetilde{M}_y \biggr\rvert_{0}^{R} \\
+\quad & \\
+\epsilon_{v,i} \quad = \quad & \int_{0}^{R} \left[\quad \tilde{p}_y \gamma_{v,i} \quad - \quad \left(\frac{T_{12} \widetilde{S}_x - \tilde{q}_z}{T_{11}}\right)\gamma_{v,i}^+ \quad - \quad \left(\frac{\gamma_{v,i}^+}{T_{11}}\right)^+ \widetilde{M}_z \right] dr \\ 
+&+\quad \frac{T_{12}\widetilde{S}_x - \tilde{q}_z - \widetilde{M}_z^+}{T_{11}}  \gamma_{v,i}\biggr\rvert_{0}^{R} \quad + \quad \frac{\gamma_{v,i}^+}{T_{11}} \widetilde{M}_z \biggr\rvert_{0}^{R} 
+\end{align*}
+Using Eq. (\ref{eqn:beamshears}), the boundary-value terms may be identified as tip loads, and the residuals of the modified PDEs can be simplified to 
+\begin{align}
+\epsilon_{\phi,i} \quad = \quad & \quad \int_{0}^{R} \quad \left(M_z \kappa_2 - M_y \kappa_3 +q_x  \right) \gamma_{\phi,i} dr \notag\\
+\label{eqn:allres1}
+ - & \quad \int_{0}^{R} \gamma_{\phi,i}^+ M_x dr \quad + \quad M_x \gamma_{\phi,i}\biggr\rvert_{0}^{R} \qquad\\
+ \quad & \notag \\
+\epsilon_{w,i} \quad = \quad & \quad \int_{0}^{R} \quad \tilde{p}_z \gamma_{w,i} dr \quad + \quad \left(\widetilde{S}_z \gamma_{w,i} - \frac{\widetilde{M}_y \gamma_{w,i}^+}{T_{11}}\right)\biggr\rvert_{0}^{R} \notag \\
+\label{eqn:allres2}
+- & \quad \int_{0}^{R} \frac{T_{13}\widetilde{S}_x + \tilde{q}_y}{T_{11}} \gamma_{w,i}^+ dr \quad + \quad \int_{0}^{R} \left(\frac{\gamma_{w,i}^+}{T_{11}}\right)^+ \widetilde{M}_y dr \qquad \\
+\quad & \notag \\
+\epsilon_{v,i} \quad = \quad & \quad \int_{0}^{R} \quad \tilde{p}_y \gamma_{v,i} dr \quad + \quad \left(\widetilde{S}_y \gamma_{v,i} + \frac{\widetilde{M}_z\gamma_{v,i}^+}{T_{11}}\right)\biggr\rvert_{0}^{R} \notag \\
+\label{eqn:allres3}
+- & \quad \int_{0}^{R} \frac{T_{12}\widetilde{S}_x - \tilde{q}_z}{T_{11}} \gamma_{v,i}^+ dr \quad - \quad \int_{0}^{R} \left(\frac{\gamma_{v,i}^+}{T_{11}}\right)^+ \widetilde{M}_z dr 
+\end{align}
+\begin{table}[ht] 
+\begin{minipage}{\columnwidth} 
+\centering
+\caption{Boundary conditions for beams}
+\label{tbl:beambc}
+\begin{tabular}{ll} \hline \hline
+Boundary condition & Mathematical Representation \\
+\hline 
+Root restraint & $\gamma_{w,i}(0)$ = $\gamma_{v,i}(0)$ = 0 \\
+Torsion restraint & $\gamma_{\phi,i}(0)$ = 0 \\
+Cantilever & $\gamma_{w,i}^+(0)$ = $\gamma_{v,i}^+(0)$ = 0\\
+Hinge & $\widetilde{M}_y(0)$ = $\widetilde{M}_z(0)$= 0 \\
+Swivel & $\widetilde{M}_x(0)$ = 0 \\
+Free end & $\vector{M}_S$ = $\vector{F}_S$ = $\vector{0}$ \\
+\hline
+\end{tabular} \end{minipage}
+\end{table}
+
+Physical considerations will be used to handle the boundary-value terms at the lower limit, i.e. $r$ = 0 or the root end. The constraint conditions for the ends of the beam that are modeled are cantilever supports and hinges. Based on these conditions, the choice of admissible trial functions is limited to those that satisfy properties given in Table \ref{tbl:beambc}. The contributions from inertial, aerodynamic and structural loads to the beam equations are computed in the routines \textbf{beam\_inertial\_loads}, \textbf{beam\_aero\_loads} and \textbf{beam\_structural\_loads}, respectively, immediately after computing the contributions to blade loads. 
+
+\subsubsection{Finite Element Discretization}
+\label{sec:FEM}
+The trial functions $\gamma_{v,i}$, $\gamma_{w,i}$, $\gamma_{\phi,i}$ must be continuous along the span to accurately reflect the nature of the physical deflections. Since the beam exhibits smoothly changing gradients of transverse deflections (slopes), the first derivatives $\gamma_{w,i}^+$, $\gamma_{v,i}^+$ must also be continuous. Therefore, polynomials are a natural choice to represent beam deflections. In cases where certain sections of the beam have higher curvatures than others, higher-order polynomials become necessary to accurately represent beam deflections but are susceptible to Runge oscillations during interpolation. Therefore, the trial functions are built using \emph{local} polynomials, or \emph{shape functions}, that are smoothly fitted over multiple segments, or \emph{finite elements}, of the beam. A natural choice of shape functions for the transverse deflections ($v$, $w$) within an element is the set of Hermite polynomials 
+\begin{align*}
+H_{w,1}(s) \quad = \quad & 2 s^3 - 3 s^2 + 1\\
+H_{w,2}(s) \quad = \quad & l_e (s^3 - 2 s^2 + s) \\
+H_{w,3}(s) \quad = \quad & 1 - H_{w,1}(s) \\
+H_{w,4}(s) \quad = \quad & l_e (s^3 - s^2)
+\end{align*}
+$s$ represents the non-dimensional span location along an element of length $l_e$. The shape functions for the ``lag'' deflection ($v$) are identical to $H_{w,i}$ given above, since the transverse deflections have identical representation constraints. For torsion, the twist angle ($\phi$) must be continuous, but the twist rate ($\phi^+$) need not. Thus, quadratic shape functions are sufficient to accurately represent linear variations in twist rate along an element, and are given by 
+\begin{align*}
+H_{\phi,1}(s) \quad = \quad & 2 s^2 - 3 s + 1\\
+H_{\phi,2}(s) \quad = \quad &-4 s^2 + 4 s \\
+H_{\phi,3}(s) \quad = \quad & 2 s^2 - s
+\end{align*}
+The shape functions for bending $H_{w,i}$ and torsion $H_{\phi,i}$ are shown in Fig. \ref{fig:FEshapefns}. The trial functions $\gamma_{w,i}$, $\gamma_{\phi,i}$ are obtained using \emph{admissible} linearly independent combinations of the shape functions, i.e. those that preserve continuity along the span and, in the case of the transverse bending, differentiability also. The trial functions for transverse bending $\gamma_{w,i}$ and $\gamma_{v,i}$ are identical, since they are constructed from the same shape functions. 
+\begin{Figure}
+ \centering
+ \includegraphics[width=0.5\linewidth]{Schematics/Slide8.png}
+ \vspace{-0.5cm}
+ \captionof{figure}{Shape Functions in a Finite Element}
+ \label{fig:FEshapefns}
+\end{Figure}
+\vspace{0.5cm}
+Figures \ref{fig:flaptrials} and \ref{fig:torsiontrials} show the trial functions for transverse bending and torsion, respectively, for a beam with four finite elements, together with the coefficients q$_{w,i}$ and q$_{\phi,i}$ that represent the numerical value of the trial function coefficients at the intersection of finite elements, called \emph{nodes}. 
+\begin{Figure}
+ \centering
+ \includegraphics[width=\linewidth]{Schematics/Slide9.png}
+ \vspace{-0.5cm}
+ \captionof{figure}{Trial Functions for Beam Bending with 4 Finite Elements}
+ \label{fig:flaptrials}
+\end{Figure}
+\begin{Figure}
+ \centering
+ \includegraphics[width=\linewidth]{Schematics/Slide10.png}
+ \vspace{-0.5cm}
+ \captionof{figure}{Trial Functions for Beam Torsion with 4 Finite Elements}
+ \label{fig:torsiontrials}
+\end{Figure}
+\vspace{0.5cm}
+The breakdown of the nodal DOF vector into its constituent components for each element is performed in the routine \textbf{beam\_theory2}.
+\subsubsection{Modal Reduction}
+\label{sec:modes}
+The flap, lag and torsion dynamics of each rotor blade is represented using 6$N_e$+5 ODEs, where $N_e$ is the number of finite elements. For a four-bladed rotor each with four finite elements, this results in 116 ODEs for the rotor dynamics. With increasing variations in the spatial distribution of aerodynamic and inertial loads (e.g. high-speed forward flight or BVI conditions), additional finite elements are required to obtain accurate blade force distributions, and the subsequent blade response and vehicle motions. However, additional finite elements also result in increased computational cost, in terms of the number of ODEs used to represent the system dynamics. One technique to \textbf{reduce the computational cost without compromising the accuracy of the load distributions }is modal reduction.
+
+The operating condition of the physical system (typical helicopter blades) are such that its structural dynamics are strongly linear, with mild contributions from non-linear components (due to axial fore-shortening and elastic flap-lag-torsion couplings). Therefore, the deflections of the rotor blade can be approximated to a linear combination of the natural mode shapes. These mode shapes are obtained from eigenvector solutions of the linearized structural dynamics for the rotating blade in vacuum, and are orthogonal to each other. Each mode is associated with a natural frequency. Higher natural frequencies are associated with larger spatial variations in the deflections (more zero crossings and larger bending curvatures/twist rates) and therefore more elastic energy. For typical rotor blades, the energy required to excite the high-frequency modes is relatively enormous, and is typically not encountered in flight, where the external forces are continuous and near-monotonic along the span. With this rationalization, \textbf{the blade response is approximated to a linear combination of a finite number of natural mode shapes}. \textbf{Modal reduction effectively decouples the computational complexity of the rotor ODEs from the spatial resolution of the external loads while preserving the dominant blade motions}. For the purpose of modal reduction, it is convenient to use the original form of the beam equations, given by
+\begin{equation*}
+\vector{g}_\textrm{rotor}(\vector{q},\dot{\vector{q}},\ddot{\vector{q}},\vector{u}) \quad = \quad \grkvec{\epsilon}_\textrm{beam} \quad = \quad \vector{0} 
+\end{equation*}
+The beam equation residuals can be subdivided into the contributions from the flap, lag and torsion equations as
+\begin{align*}
+\grkvec{\epsilon}_\textrm{beam}\quad = \quad & \renewcommand\arraystretch{0.5}\begin{Bmatrix} \qquad \grkvec{\epsilon}_\phi\tr \qquad \grkvec{\epsilon}_w\tr \qquad \grkvec{\epsilon}_v\tr \qquad \end{Bmatrix}\tr \\
+\epsilon_{\phi,i}, \epsilon_{w,i} \textrm{ and } \epsilon_{v,i} & \textrm{ are given by } \textrm{Eqs. } (\ref{eqn:allres1}) - (\ref{eqn:allres3}) \\
+\grkvec{\epsilon}_\phi \quad = \quad & \renewcommand\arraystretch{0.5}\begin{Bmatrix} \qquad \epsilon_{\phi,1} \qquad \epsilon_{\phi,2} \quad \cdots \quad \epsilon_{\phi,n} \qquad \spc \end{Bmatrix}\tr \\
+\grkvec{\epsilon}_w \quad = \quad & \renewcommand\arraystretch{0.5}\begin{Bmatrix} \qquad \epsilon_{w,1} \qquad \epsilon_{w,2} \quad \cdots \quad \epsilon_{w,n} \qquad \end{Bmatrix}\tr \\
+\grkvec{\epsilon}_v \quad = \quad & \renewcommand\arraystretch{0.5}\begin{Bmatrix} \qquad \epsilon_{v,1} \qquad \epsilon_{v,2} \quad \cdots \quad \epsilon_{v,n} \spc \qquad \end{Bmatrix}\tr \\
+\textrm{ The nodal degrees of freedom are} & \\
+\vector{q} \quad = \quad & \renewcommand\arraystretch{0.5}\begin{Bmatrix} \qquad \vector{q}_{w}\tr \qquad \vector{q}_{v}\tr \qquad \vector{q}_{\phi}\tr \qquad \end{Bmatrix}\tr \\
+\textrm{Where} \qquad \qquad \qquad \qquad & \\
+\vector{q}_w \quad = \quad & \renewcommand\arraystretch{0.5}\begin{Bmatrix} \qquad q_{w,1} \qquad q_{w,2} \qquad \cdots \qquad q_{w,n} \quad \quad \spc \end{Bmatrix}\tr \\
+\vector{q}_v \quad = \quad & \renewcommand\arraystretch{0.5}\begin{Bmatrix} \qquad q_{v,1} \qquad q_{v,2} \qquad \cdots \qquad q_{v,n} \qquad \quad \end{Bmatrix}\tr \\
+\vector{q}_\phi \quad = \quad & \renewcommand\arraystretch{0.5}\begin{Bmatrix} \quad \quad q_{\phi,1} \qquad q_{\phi,2} \qquad \cdots \qquad q_{\phi,n-1} \spc  \quad \spc  \end{Bmatrix}\tr
+\end{align*}
+$\vector{q}_w$, $\vector{q}_v$ represent the flap and lag nodal degrees of freedom respectively, each of which number $n$ = $2N_e+2$. The torsion nodal degrees of freedom are $\vector{q}_\phi$ which number $n-1$ = $2N_e+1$. Figures \ref{fig:flaptrials} and \ref{fig:torsiontrials} show the nodal degrees of freedom for flap bending and torsion,  respectively, for four finite elements. 
+
+The entries in row $i$ and column $j$ of the stiffness and mass matrix are approximated using finite differences, and are given by 
+\begin{align*}
+K_{i,j} \quad = \quad \frac{\partial \grkvec{\epsilon}_\textrm{beam}(i)}{\partial \vector{q}(j)} \quad \approx \quad \frac{\Delta \grkvec{\epsilon}_\textrm{beam}(i)}{\Delta \vector{q}(j)} \\
+M_{i,j} \quad = \quad \frac{\partial \grkvec{\epsilon}_\textrm{beam}(i)}{\partial \ddot{\vector{q}}(j)} \quad \approx \quad \frac{\Delta \grkvec{\epsilon}_\textrm{beam}(i)}{\Delta \ddot{\vector{q}}(j)}
+\end{align*}
+$\Delta \grkvec{\epsilon}_\textrm{beam}(i)$ represents the change in the residual of the $i^\textrm{th}$ beam equation. $\Delta \vector{q}(j)$ and $\Delta \ddot{\vector{q}}(j)$ represent, respectively, perturbations in the $j^\textrm{th}$ nodal degree of freedom and its second time derivative. These matrices are computed in the routine \textbf{compute\_MK}. 
+
+The linearized beam dynamics in vacuum may then be written as a series of coupled second-order ODEs given by 
+\begin{equation}
+\label{eqn:linbeam}
+\textbf{M} \spc  \ddot{\vector{q}}(t) \quad + \quad \textbf{K} \spc  \vector{q}(t) \quad = \quad \vector{0}
+\end{equation}
+Since \textbf{M} and \textbf{K} are time-invariant, the solution for the nodal degrees of freedom $\vector{q}$ is of the form 
+\[ \vector{q}(t) \quad = \quad \vector{q}_\textbf{0} \spc  \sin \omega t \]
+Substituting this solution into Eq. (\ref{eqn:linbeam}) yields the following Eigenvalue problem
+\[ \textbf{M} \spc  \omega^2 \spc  \vector{q}_\textbf{0} \quad  = \quad  \textbf{K} \spc  \vector{q}_\textbf{0} \]
+An inspection of the above expression reveals that the square roots of the Eigenvalues represent the natural frequencies of the rotating beam. The Eigenvectors represent the natural mode shapes of the rotating beam. When the cumulative spanwise distribution of the external loads resembles a particular mode shape, the blade response consists predominantly of that mode shape. The Eigenvectors for the modes of interest are assembled into a matrix \textbf{V}, and the nodal degrees of freedom can be computed from the mode coefficients $\grkvec{\eta}$ as 
+\[ \vector{q} \quad = \quad \grkvec{\eta}\tr \spc  \textbf{V} \]
+The mode coefficients $\grkvec{\eta}$ are the generalized displacements of the rotor blades when modal reduction is used. If modal reduction is not selected, then \textbf{V} is set to an identity matrix of the appropriate size, and the generalized displacements are the nodal degrees of freedom ($\vector{q}_\phi$ , $\vector{q}_w$ , $\vector{q}_v$) of the flexible beam.
+
+\textbf{Modal reduction can be conceptualized as a second-stage Galerkin method applied to the modified beam PDEs}. The nodal degrees of freedom are expressed as a linear combination of the normal mode shapes. In Galerkin's method, the trial functions must be equal to the shape functions used to represent the nodal deflections. (For modal reduction, the term ``function'' may be somewhat misleading, since the shape functions - Eigenvectors - consist of discrete values of the beam deflection at the finite element nodes.) Therefore, the residuals of the modified PDEs are weighted by the Eigenvector matrix to yield the beam residuals corresponding to the generalized coordinates as
+\begin{equation}
+\label{eqn:epsbeam}
+\grkvec{\epsilon}_\textrm{modes} \quad = \quad \textbf{V}\tr \spc  \grkvec{\epsilon}_\textrm{beam}
+\end{equation}
+Boundary conditions are applied before computing the eigenvalues by the routine \textbf{apply\_BC}. Once the normal modes are obtained, the eigenvector entries corresponding to the specified boundary conditions are inserted into the appropriate rows of the reduced solution by the subroutine \textbf{inject\_BC}.

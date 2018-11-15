@@ -1,0 +1,8 @@
+# material properties of aluminum
+# all values are in SI units
+Material:
+   name: 'aluminum'
+   elastic_modulus: 68.9e9
+   poissons_ratio : 0.33
+   density        : 2700.0
+   yield_stress   : 276e6

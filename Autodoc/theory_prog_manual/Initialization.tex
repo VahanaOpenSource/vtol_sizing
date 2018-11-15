@@ -1,0 +1,122 @@
+\section{Initialization}
+\subsection{Subroutine deallocate\_variables}
+This subroutine deallocates variable-sized arrays located inside modules. It is called once at the beginning of the program to flush arrays in case the code terminated unexpectedly during the previous run, and again at the end to free the module variables.
+
+\subsection{Subroutine assign\_constants}
+This subroutine assigns numeric constants like zero, one, two, $\pi$, etc. and remembers these values in a module. This feature is useful for two main reasons:
+\begin{enumerate}
+\item Changing precision is easy, since these constants are not hard-coded to single or double precision in later routines.
+\item The code looks more like natural English, and will still make sense when read by a person. (e.g. dyn\_pressure = half * rho * V * V)
+\end{enumerate}
+
+This subroutine also assigns the quadrature weights and locations along the span for the rotor blade, and also the azimuthal locations where blade loads are sampled for trim. The Gauss-Legendre weights and locations are computed in the interval [0,1] by the subroutine \textbf{gqgen2}, which is a modified expansion of a carry-over routine from Heli-UM. Quadrature locations and weights are stored in the module \textbf{gaussian}. 
+
+\subsection{Subroutine gqgen2}
+This subroutine generates the Gauss-Legendre quadrature points in the interval [0,1] for a user-specified number of points. This routine is called twice in assign\_constants: once for the spatial locations, and another time for the azimuthal locations within a time element. The quadrature points are the roots of Legendre polynomials $P_n(z)$, which obey some interesting recurrence relations. We will use them to generate the roots of the Legendre polynomial. The logic is explained below.
+
+\subsection*{\textbf{Numerical Integration}}
+
+The external loads on rotating and non-rotating beams are integrated numerically along the span of the blades to determine the forces and moments transmitted to the hub. These integrals are computed numerically using Gaussian Quadrature using weighted summation of the integrand values at specific points along the span. 
+\[ \textbf{I} \quad = \quad \int \textrm{ }f(r) \textrm{ } dr \]
+\textbf{I} denotes the integral, $f$ the integrand and $r$ the spanwise coordinate along the deformed elastic axis. Using numerical quadrature, 
+\[ \textbf{I} \quad \approx \quad \sum_{i=1}^{n} w_i \textrm{ } f(r_i) \]
+The points $r_i$ are the zeros of the Legendre polynomials, which obey some recurrence relations. The first relation is known as Bonnet's recursion formula, given by 
+\[ n \textrm{ } P_n(x) \quad = \quad (2n-1) \textrm{ } x \textrm{ } P_{n-1}(x) \quad - \quad (n-1) \textrm{ } P_{n-2}(x) \]
+$P_n(x)$ is a Legendre polynomial of order ``n'', given by Rodrigues' formula
+\[ P_n(x) \quad = \quad \frac{1}{2^n \textrm{ }n!} \textrm{ }\frac{d^n}{dx^n} \textrm{ }\left[\left(x^2\textrm{ }-\textrm{ }1\right)^n\right] \]
+Another recurrence relation is 
+\[ \frac{x^2\textrm{ } -\textrm{ } 1}{n} \textrm{ } \frac{d P_n(x)}{dx} \quad = \quad (2n+1) \textrm{ } x \textrm{ } P_n(x) \quad - \quad n \textrm{ } P_{n-1}(x) \]
+$n$ is the user-specified number of quadrature points. The Gauss-Legendre quadrature weights corresponding to each of the locations is given by (Ref. \cite{Abramowitz1964})
+\[ w_i \quad = \quad \frac{2}{\left(\textrm{ } 1\textrm{ } -\textrm{ } x_i^2\textrm{ } \right) \textrm{ } \left[ P_n \textrm{}^\prime (x_i)\right]^2} \]
+Using iterative convergence, the quadrature locations and the slope of the Legendre polynomial may be identified by using the recurrence relations, starting from an initial guess given by 
+\[  x_i \quad = \quad \cos \left[\pi \frac{4 i - 1}{4n + 2}\right] \qquad \qquad i = 1,2,3,\cdots,n\]
+These locations are generated assuming that the integration range is $[-1,1]$. The quadrature locations and weights may be transformed for use over other limits using a change of coordinates along $x$.
+
+\subsection*{\textbf{Intermediate Quadrature}}
+The simulation of beam dynamics requires the computation of the accumulated external loads, from the tip to a certain location of interest. Additionally, the axial fore-shortening $u$ and the Euler rotation angle $\theta_1$ require the accumulated values of certain integrations from the root value to the radial location at which these quantities are evaluated. These ``intermediate'' integrals (so labelled because the limits lie between nodes of finite elements) are evaluated by fitting a polynomial to the sampled values of the integrand within the finite element, and integrating the \emph{fitted} polynomial to reduce computational cost. 
+
+Assume that the integrand $f$ is sampled at $n$ points $x_1$, $x_2$, $\cdots$, $x_n$. Let the corresponding values of $f$ at these points be $f_1$, $f_2$, $\cdots$, $f_n$. Let the \textit{approximate} integrand $g(x)$ be represented using a polynomial, given by 
+\[ f(x) \quad \approx \quad g(x) \quad = \quad \sum_{i = 1}^{n} a_{i-1} \textrm{ } x^{i-1} \]
+The coefficients $a_i$, $i$ = 1, 2, $\cdots$, $n$ are determined from the sampled values of the true integrand $f(x)$ at locations $x_i$ using polynomial interpolation. If the approximate integrand matches the true integrand at ($x_1$, $x_2$, $\cdots$, $x_n$) then
+\[ \begin{Bmatrix} f(x_1) \\ f(x_2) \\ \cdot \\ \cdot \\ f(x_n) \end{Bmatrix} \quad = \quad \begin{bmatrix} 1 & x_1 & x_1^2 & \cdots & x_1^{n-1} \\ 1 & x_2 & x_2^2 & \cdots & x_2^{n-1} \\ \cdot  & \cdot & \cdot & \cdot & \cdot \\ \cdot  & \cdot & \cdot & \cdot & \cdot \\ 1 & x_n & x_n^2 & \cdots & x_n^{n-1} \end{bmatrix} \quad  \begin{Bmatrix} a_0 \\ a_1 \\ \cdot \\ \cdot \\ a_{n-1} \end{Bmatrix} \]
+This system of linear equations may be written as a matrix-vector product
+\[ \vector{f} \quad = \quad \textbf{C} \textrm{ } \vector{a} \]
+\textbf{C} is invertible as long as all quadrature locations are unique. The polynomial coefficients $\vector{a}$ are obtained by inverting \textbf{C} to yield 
+\[ \vector{a} \quad = \quad \textbf{C}^{-1} \textrm{ } \vector{f} \]
+The approximate integrand may be integrated along the span of the element using different limits, depending on the quantity of interest. For displacement quantities (Euler rotation $\theta_1$ and axial fore-shortening $u$) the integration limits are from the left end of the element to the quadrature point of interest. The integrated value is 
+\[ \textrm{I}_\textrm{inboard}(x_1) \quad = \quad \int_{0}^{r_{_1}} \textrm{ } g(r_{_1}) \textrm{ }  dr_{_1} \quad = \quad \frac{dr}{dx} \textrm{ } \sum_{i = 1}^{n} a_{i-1} \textrm{ } \frac{x_1^{i}}{i} \]
+$\frac{dr}{dx}$ represents the scale factor between the non-dimensional coordinate $x$ and the dimensional coordinate $r$. The summation may be written as a matrix-vector product 
+
+\[ \textrm{I}_\textrm{inboard}(x_1) \quad = \quad \frac{dr}{dx} \quad \begin{Bmatrix} x_1 & & \frac{1}{2} x_1^2 & & \cdots & &\frac{1}{n-1} x_1^{n-1} \end{Bmatrix} \textrm{ } \begin{Bmatrix} a_0 \\ a_1 \\ \cdot \\ \cdot \\ a_{n-1} \end{Bmatrix} \]
+Using the same notation for the integrals at the other quadrature points, we obtain
+\[ \begin{Bmatrix} \textrm{I}(x_1) \\ \textrm{I}(x_2) \\ \cdot \\ \cdot \\ \textrm{I}(x_n)\end{Bmatrix}_\textrm{inboard} = \quad \frac{dr}{dx} \textrm{ } \begin{bmatrix} x_1 & & \frac{1}{2} x_1^2 & & \cdots & &\frac{1}{n-1} x_1^{n-1} \\ x_2 & & \frac{1}{2} x_2^2 & & \cdots & &\frac{1}{n-1} x_2^{n-1} \\ \cdot & & \cdot & & \cdot & & \cdot \\ \cdot & & \cdot & & \cdot & & \cdot \\ x_n & & \frac{1}{2} x_n^2 & & \cdots & &\frac{1}{n-1} x_n^{n-1} \end{bmatrix} \begin{Bmatrix} a_0 \\ a_1 \\ \cdot \\ \cdot \\ a_{n-1} \end{Bmatrix}
+\] 
+The vector of integrals $\vector{I}$ may be written as another matrix vector product as 
+\[ \vector{I}_\textrm{inboard} \quad = \quad \frac{dr}{dx} \textrm{ }\textbf{E} \textrm{ } \vector{a} \quad = \quad \frac{dr}{dx} \textrm{ }\textbf{E} \textrm{ }\textbf{C}^{-1} \textrm{ }\vector{f} \]
+Similarly, the vector of integrals with limits from the current radial position to the outboard end of the finite element is 
+\[ \vector{I}_\textrm{outboard} \quad = \quad \frac{dr}{dx} \textrm{ }\textbf{F} \textrm{ } \textbf{C}^{-1} \textrm{ } \vector{f} \]
+The entries in row $i$ and column $j$ of \textbf{E} and \textbf{F} are 
+\[ E(i,j) \quad = \quad E_{ij} \quad = \quad \frac{1}{j} x_i^{\textrm{ } j} \qquad \textrm{and} \qquad F(i,j) \quad = \quad F_{ij} \quad = \quad \frac{1}{j} \textrm{ } \left(1- x_i^{\textrm{ } j}\right) \]
+The matrices \textbf{E} \textbf{C}$^{-1}$ and \textbf{F} \textbf{C}$^{-1}$ are independent of loads and can be pre-computed. The term $\frac{dr}{dx}$ is the dimensional length of the finite element $l_e$.
+
+\section*{Reading Input Files}
+This section explains the code logic governing file read operations and preprocessing steps that are performed prior to any simulation. This step includes reading input files and choosing rotor configurations, aircraft information, flight or wind-tunnel conditions, etc. The call graph is shown below, complete with all dependencies. The various subroutines that read program input files from the subfolder \textbf{Inputs/} are listed below. For a detailed list of the individual inputs, please refer to the user manual. 
+
+\subsection{Subroutine read\_solver\_options}
+This subroutine reads the program operations from the file \textbf{Solver\_options.input} that specifies the spatial and time discretization for the rotorcraft model, and chooses which of the operations to perform (modal reduction, trim, transfer functions and time marching). Based on the values in the input files, some input files may be omitted if they are not relevant to the configuration chosen. The solver options are stored in a derived type called \textbf{SolverOptions}, in the module \textbf{py\_visible\_globals}.
+
+\begin{Figure}
+ \centering
+ \includegraphics[width=1.0\linewidth]{images/read_pgmin_callgraph.png}
+ \captionof{figure}{Call Graph for Reading Program Input Files}
+ \label{fig:mpcg}
+\end{Figure}
+
+\subsection{Subroutine read\_wake\_inputs}
+This subroutine reads the free wake discretization parameters from \textbf{Free\_wake.input}, if the flag to use the vortex wake model is enabled in Solver\_optoins.input. If the flag is set to \textbf{.F.}, then this subroutine is bypassed. These parameters are stored in a derived type called \textbf{Free\_wake}, located in the module \textbf{py\_invisible\_globals}.
+
+\subsection{Subroutine read\_composite\_coupling}
+This subroutine is not yet at the ``production stage''. It is meant to provide structural cross-couplings in the blade dynamics to represent composite material properties.
+
+\subsection{Subroutine read\_flight\_condition}
+This subroutine reads the file \textbf{Flight\_condition.input}, which specifies the vehicle speed, altitude, turn rate and climb angle, i.e. target trim conditions. These parameters are stored in a derived type called \textbf{FlightParam}, in the module \textbf{py\_visible\_globals}.
+
+\subsection{Subroutine read\_airloads}
+This subroutine is used for CFD-CSD coupling, but may be bypassed by setting the appropriate flags to \textbf{.F.} in \textbf{Solver\_options.input}. It reads airloads (section C$_\ell$, C$_d$ and C$_m$) along the span and around the azimuth for all rotors over one revolution, and returns interpolated loads through a derived type \textbf{Airloads} in the module \textbf{py\_visible\_globals}. This subroutine calls three subroutines:
+
+\subsubsection{Subroutine open\_and\_read}
+This subroutine reads airloads distributions from disk, given a file unit identifier. The airloads must be in the OVERTURNS format. 
+
+\subsubsection{Subroutine interp\_airloads}
+This subroutine interpolates airloads distributions from OVERTURNS radial and azimuthal locations to those required by the CSD solver, using a custom routine written for polar coordinates. This subroutine calls a subroutine \textbf{linterp\_weights} to generate linear interpolation weights and indices along the span and azimuth. 
+
+\subsubsection{Subroutine test\_write}
+This subroutine writes the airloads from a derived type to various output files to verify that the interpolation did not fail.
+
+\subsection{Subroutine read\_tunnel\_targets}
+This subroutine reads the wind tunnel conditions from the file \textbf{Wind\_tunnel.input}, but is bypassed in propulsive trim, indicated by the appropriate flags in \textbf{Solver\_options.input}. It reads shaft tilt, target hub loads, target swashplate controls and type of wind-tunnel trim to perform.
+
+\subsection{Subroutine write\_postprocessor}
+This subroutine writes the output file \textbf{options\_trim.dat} that can be used by postprocessors to interpret the numbers in the batch run output files \textbf{Outputs/Trim\_01.dat} and \textbf{Outputs/Trim\_02.dat}. Refer to the user manual for more details on the individual outputs.
+
+\subsection{Subroutine read\_databases}
+This subroutine reads the physical properties of the rotor blades, number of rotors, airfoil tables, fuselage aerodynamic force tables, etc and stores these physical constants in a multiply nested derived type called \textbf{Aircraft} (name preserved from HeliUM convention) in the module \textbf{py\_invisible\_globals}. The purpose of this subroutine is to read all available databases and aircraft configurations, and selectively preserve the ones required for the current simulation. After reading individual blade and airfoil properties, the required rotor structural and aerodynamic characteristics are assembled. The required airfoil tables are stored in memory, and a map is created between the airfoil identifier and its storage location in memory to enable faster access. Finally, the blade structural properties are interpolated and stored at the quadrature points at each finite element in the subroutine \textbf{assign\_rotor\_properties} under the derived type \textbf{BeamProperties}, nested under the \textbf{Blade} type, which is nested under the \textbf{Rotor} type, and finally under the \textbf{Aircraft} type. These numbers do not change during a simulation, and the \textbf{Aircraft} type may be used with the \textbf{intent(in)} keyword to enforce coding consistency. 
+
+In addition to obtaining structural properties for the CSD solver, the subroutine \textbf{assign\_rotor\_properties} also obtains blade chord and twist for the free wake solver at equi-spaced radial locations between the blade root cut-out and tip.
+
+\subsection*{Non-Dimensionalization}
+The analysis has been performed in a non-dimensional form to avoid overflow and underflow truncation errors. Table \ref{tbl:nondiml} shows the reference parameters used to nondimensionalize the relevant physical quantities. $\Omega_0$ is initially set to the rotor speed, but any value may be chosen for the time constant. This feature is extremely useful, since it allows for changing rotor RPM during batch runs.
+\begin{table}[ht] 
+\begin{minipage}{\columnwidth} 
+\centering
+\caption{Fundamental Non-Dimensionalization Constants}
+\label{tbl:nondiml}
+\begin{tabular}{ll} \hline \hline
+Physical Quantity & Reference Parameter	  	\\
+\hline 
+Mass per unit span & Average blade mass per unit span m$_0$ = $\displaystyle \frac{W_\textrm{b}}{g}$\\
+Length 			   & Beam Length (R) \\
+Time			   & $\Omega_0^{-1}$ \\ 
+\hline
+\end{tabular} \end{minipage}
+\end{table}

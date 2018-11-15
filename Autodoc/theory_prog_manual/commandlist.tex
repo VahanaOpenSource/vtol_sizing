@@ -1,0 +1,61 @@
+\newenvironment{Figure}
+  {\par\medskip\noindent\minipage{\linewidth}}
+  {\endminipage\par\medskip}
+\setlength{\textwidth}{5.9in}
+\setlength{\textheight}{9in}
+\setlength{\topmargin}{-.50in}
+%\setlength{\topmargin}{0in}    %use this setting if the printer makes the the top margin 1/2 inch instead of 1 inch
+\setlength{\oddsidemargin}{.55in}
+\setlength{\parindent}{.4in}
+
+%get a bold face "R" with arguments)
+\newcommand{\arr}[3]{\textbf{R}\left(#1,#2,#3\right)}
+
+%small bold "r" with vector
+\newcommand{\aar}{\textbf{r}}
+
+%double underscore with \textrm
+\newcommand{\ud}[1]{_{_\textrm{#1}}}
+
+%single space with \textrm{}
+\newcommand{\spc}{\textrm{ }}
+
+%\newcommand\pmat[4]{\ensuremath{\begin{pmatrix} #1 & #2 \\ #3 & #4\end{pmatrix}}}
+
+%get a bold face "T"
+\newcommand{\tee}{\textbf{T}}
+
+%^T symbol for transpose
+\newcommand{\tr}{^{^\textrm{T}}}
+
+%short notation for denoting a vector			    % removed overline
+\renewcommand{\vector}[1]{\textbf{#1}}
+
+%short notation for a vector with greek stuff		% removed overline
+\newcommand{\grkvec}[1]{\boldsymbol{#1}}
+
+%To obtain a character with bold and italics
+\newcommand{\qvec}[1]{\textbf{\textit{#1}}}
+
+% Place a "hat" with italics around a bold italicized letter (see prev for \qvec)
+\newcommand{\ihat}[1]{\mathit{{\qvec{#1}}}}			% removed hat after mathit
+\newcommand{\ihatpr}[1]{\mathit{{\qvec{#1}^\prime}}} 		% removed hat
+
+% Write a unit vector "i,j,k" with the required suffix
+\newcommand{\pmat}[1]{\ensuremath{\begin{Bmatrix} \ihat{i}_{_\textrm{#1}} \\ \ihat{j}_{_\textrm{#1}} \\ \ihat{k}_{_\textrm{#1}} \end{Bmatrix}}}
+
+% Write a unit vector "i,j,k" with the required suffix in a row vector
+\newcommand{\hmat}[1]{\ensuremath{\begin{Bmatrix} \ihat{i}_{_\textrm{#1}} & \ihat{j}_{_\textrm{#1}} & \ihat{k}_{_\textrm{#1}} \end{Bmatrix}}}
+
+% Write a unit vector "i,j,k" 
+\newcommand{\qmat}[1]{\ensuremath{\begin{Bmatrix} \ihat{i}^{#1} \\ \ihat{j}^{#1} \\ \ihat{k}^{#1} \end{Bmatrix}}}
+
+% Write a unit vector "i,j,k" with suffixes
+\newcommand{\rmat}[2]{\ensuremath{\begin{Bmatrix} \ihat{i}^{#1}{#2} \\ \ihat{j}^{#1}{#2} \\ \ihat{k}^{#1}{#2} \end{Bmatrix}}}
+
+%to represent undeformed frame vector quantities
+\newcommand{\udvec}[1]{\widetilde{\textbf{#1}}}
+
+%====================================================
+\newcommand{\tbsp}{\rule{0pt}{18pt}} %used to get a vertical distance after \hline
+\renewcommand{\baselinestretch}{2}

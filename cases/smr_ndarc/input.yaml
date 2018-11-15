@@ -1,0 +1,79 @@
+Sizing:
+   disk_loading:       [10.03] # lb/ft2
+#   rotor_radius:       [21.676]          # use instead of DL; both give same answer
+   number_blades:      [4]  
+   tip_speed:          [213.36] # m/s
+   tip_mach:           [0.95]
+   wing_aspect_ratio:  [1]
+   wing_lift_fraction: [0.0]
+   rotor_solidity:     [0.1178]
+   fl_freq:            [1.035]
+
+#fidelity options for weight and performance models
+   ifea:               0
+   iblade:             0
+   icomprehensive:     0
+   use_bemt:           False
+
+# note: 4k95 = 1219.2 m, ISA + 27.92 C, 6k95 = 1828.8 m, ISA + 11.88 C
+# flight mode: 0-idle, 1-hover, 3-cruise
+Mission:
+   nsegments:          6
+   flight_mode:        [      0,      1,      3,      3,      3,      3]
+   condition:          [   'f1',   'f2',   'f2',   'f2',   'f2',   'f2'] # this condition over-rides any other input
+   time_seg:           [      5,      5,   2.42,   8.23,   84.9,      5] # minutes
+   start_altitude:     [ 1219.2, 1219.2, 1219.2, 1828.8, 1828.8,    0.0] # m
+   end_altitude:       [ 1219.2, 1219.2, 1828.8, 1828.8, 1828.8,    0.0] # m
+   delta_temp_isa:     [  27.92,  27.92,  11.88,      0,      0,      0] # centrigrade
+   rate_of_climb:      [      0,      0, 251.86,      0,      0,      0] # m/min
+   cruise_speed:       [      0,      0,  85.33, 157.16, 159.03,  70.74] # knots
+   add_payload:        [      0,      0,      0,      0,      0,      0] # jettison/pick up additional payload
+   distance:           [      0,      0,   -1.0,  39.93,  416.7,   -1.0] # km
+   fixed_GTOW:         6454.0               # switch on to check indiv. components
+# 1: SMR, 3: Coax, 4: Quadrotor (needs to be improved), 5: QBP
+Aircraft:
+   aircraftID: 1
+
+# payload and crew (kg)
+   mass_payload:      1134.0
+   mass_crew:         0 
+   mass_common_equip: 1412.0    # fixed values from ndarc output
+   
+# rotor parameters
+   nrotor:            1
+   overlapping:       [0]
+   rotor_offset:      0
+   rotor_shaft_tilt:  0
+
+# wing parameters
+   nwing:             0
+   wing_offset:       -1.0
+
+# aux thrusters
+   npropeller:        0
+
+   # engine parameters
+   nengine:           2
+   engineID:          1
+   engineType:       'turboshaft' 
+
+
+Paths:
+   prasadum: '/home/yosemite/Dropbox/PrasadUM/'
+
+
+
+
+
+# -------------------------------------------------------------------
+# NOTES
+# -------------------------------------------------------------------
+
+# - Sizing inputs can have either [blade_aspect_ratio OR rotor_solidity],
+#   [disk_loading OR rotor_radius] as inputs, but NOT both
+
+
+
+
+
+

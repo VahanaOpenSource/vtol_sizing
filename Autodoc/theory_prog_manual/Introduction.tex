@@ -1,0 +1,99 @@
+\section{\textbf{Introduction}}
+
+\textbf{PRASADUM} stands for Parallelized Rotorcraft Analysis for Simulation and Design, University of Maryland. The program has the following features:
+\begin{enumerate}
+\item \textbf{Trim Analysis} (steady non-accelerating flight)
+\item \textbf{Stability Analysis} (frequency response of linearized models) 
+\item \textbf{Time Marching} (e.g. maneuver)
+\end{enumerate}
+
+The main focus of this document is to explain the theory and implementation of all vehicle/rotor/flowfield dynamics used to model the rotorcraft. The theory, if any, will be explained side-by-side with the corresponding code snippet/file. 
+
+\subsection{\textbf{Programming Language and Syntax}}
+\textbf{PRASADUM} is written in Fortran90, with heavy emphasis on derived types to pass information across subroutines. It is coupled to the Maryland Free Wake (\textbf{MFW}), parts of which are in Fortran77 and other parts in Fortran90. 
+
+Three fortran compilers have been tested and verified to work with the code: gfortran, intel fortran and PGI fortran. Among these three, gfortran is free, while ifort and pgfortran require academic or commercial licenses to work. The main advantage of pgfortran is the availability of support for CUDA-Fortran, while executables generated with ifort consistently run faster than those generated with gfortran and pgi fortran. Some old non-commercial versions of ifort do not trap bugs consistently, and gfortran/pgfortran shine in this regard.
+
+MFW is parallelized to run with CUDA Fortran or OPENMP, depending on the compilation options. The rotor dynamics are parallelized using OPENMP. Parallelization can be optionally activated or actively suppressed using preprocessing compilation flags. 
+
+\subsection{\textbf{Pre-Requisites}}
+A \textbf{Fortran90 compiler} is required to create the executable. Due to the use of free-format coding, derived types and modules, \emph{a Fortran77 compiler is not sufficient}. On Linux, a \textbf{Makefile} (containing a set of instructions to create object files, library files and the program) is used to create the executable. This file is included in the code directory under the \textbf{subfolder exec/}.
+
+The instructions in this file are relevant to the Linux operating system. Setting up the license server for the PGI compiler may be tricky the first time around, requiring a couple of restarts/logouts. If you want to try running the code on Windows, you hopefully have a GUI that can add files and create the makefile for you. On Mac, there are some issues with setting the stack size - it must be done during compilation and not as a profile default (the OS imposes a limit of 8MB that cannot be changed in profile preferences). \textbf{LAPACK} may also be required if the chosen fortran compiler / operating system does not have the required libraries.
+
+\subsection{\textbf{Source Code Directories}}
+All source code to be compiled is located in \textbf{PRASADUM/Source}, under various subfolders. Each subfolder contains a collection of subroutines or functions that pertain to specific types of operations. All subfolders contain source code in files that have to be compiled in alphabetical order. These subfolders are discussed below.
+\subsubsection{Basic Operations: Source/BasicDefs/}
+This subfolder contains operations that are applicable to any dynamical simulation and numerical operations that are not specific to a flying vehicle. Examples of operations defined in this folder are a rotation matrix and its time derivatives, LQR gain generator for a linear system, wrappers to easily call \textbf{NETLIB} routines and identifying the interval in a list that contains a specific value. These routines are called by parts of the program, and are separated for clarity. If required, these files can be pasted into the ``main'' code directory \textbf{Source/HeliSrc}. The interfaces for calling these routines is defined in \textbf{basic\_interface\_defs.F90}. These interfaces check the argument types and sizes that are passed to subroutines, and allow for easy error identification - while compiling - during code modification.
+
+\subsubsection{Beam Dynamics: Source/beamdynamics/}
+This subfolder contains the routines needed to simulate the dynamics of a rotating beam with airfoil sections (rotor blade or fixed wing). The routine to be called is \textbf{beam\_theory2} in the \textbf{.F90} file of the same name. Interfaces for the various subroutines are contained in \textbf{aa0\_beam\_dyn\_interfaces.F90}. This type of file naming (starting with aa0, aa1, etc.) is used to ensure that in this subfolder, these are the first files to be compiled.
+
+\subsubsection{Information Transfer: Source/CFD\_CSD/}
+This folder contains the routines needed to read airloads from a CFD solution, and interpolate them on to the radial and azimuthal stations corresponding to the CSD solver grid. It also contains a basic subroutine that is used for linear interpolation from one 1-D grid to another. These files must be compiled only after compiling the modules defined in \textbf{Source/HeliSrc}, described below.
+
+\subsubsection{Rotorcraft Dynamics: Source/HeliSrc/}
+This folder contains the ``main'' program \textbf{prasadum.F90}, along with definitions of various derived types, modules and routines that contain various numerical operations and features. This folder also contains the interface routines that generate information for, run and processing outputs from the free wake solver. The files in this folder must be compiled in alphabetical order.
+
+\subsubsection{NETLIB FILES: Source/MathOps/}
+ This subfolder contains the ODE Solver, algebraic equation solver and various dependencies needed for linear algebra and matrix operations. These files should not be modified under any circumstances. The only exception is \textbf{hybrd.f}, which has been changed to obtain accelerated solutions with FET using approximate reduced trim Jacobians. These files can be compiled independent of the rest of the code, except for hybrd.f.
+ 
+\subsubsection{Python Integrated Routines: Source/pyint\_files/}
+This subfolder contains routines that can be accessed from python,using \textbf{f2py} and James Kermode's \textbf{f90wrap} modification for derived types. These files can be compiled only after creating the modules in \textbf{Source/HeliSrc/}. 
+
+\subsubsection{Python-Accesible Modules: Source/pyint\_modules/}
+This subfolder must be compiled first, since it contains some array bounds used to define the size of matrices and vectors in some derived types. The files in this folder also contain module variables used to define universal constants like one, zero, $\pi$, etc. to the required precision. Using James Kermode's f2py-f90wrap interface, python can access and modify these module variables directly without having to pass arrays or variables to interface routines. 
+
+\subsubsection{Free Wake Files: Source/Wake/}
+This subfolder contains the source code for the Maryland Free Wake, developed by students of Prof.J.G. Leishman. This version of the wake has been modified to use blade motion, pitch control, flight condition and rotor geometry from a general CSD solver through the \textbf{Free\_wake} derived type. The source files must be compiled after creating the modules in \textbf{Source/HeliSrc/}.
+
+\subsection{\textbf{Main Program : Fortran and Python Version}}
+The file \textbf{Source/HeliSrc/prasadum.F90} contains the Fortran ``main'' program that drives the code when running in pure Fortran mode. Alternately, python can be used to call various subroutines and program features. To use python to drive the program, the following steps are necessary:
+\begin{enumerate}
+\item The object files from each source file must be linked into a single archive. This archive must be prefixed with ``lib''. The Makefile provided creates both the main program \textbf{prasadum} and the archive \textbf{libsrc.a}. This step can be performed automatically by running in the subfolder \textbf{exec/}
+\begin{center}
+\qquad \qquad \textbf{make -f Makefile} \qquad or, simply, \textbf{make}
+\end{center}
+\item The files in \textbf{Source/pyint\_files/} and \textbf{Source/pyint\_modules/} must be compiled with the \textbf{f90wrap-f2y} preprocessor and linked with the library to create a python \textbf{shared object (.so)} file. This step is performed automatically by running, in the subfolder \textbf{exec/}
+\begin{center}
+\textbf{make -f Makefile\_py}
+\end{center}
+\item Finally, the python file must ``import'' the shared object before calling any subroutines. This step is performed by typing, in the python file,
+\begin{center}
+\textbf{from mockdt import *}
+\end{center}
+For details, see the file \textbf{exec/test\_module.py}. To keep things simple, the pure Fortran version is explained in this manual.
+\end{enumerate}
+
+\subsection{\textbf{The Main Program: prasadum}}
+\begin{Verbatim}[baselinestretch=1.0]
+      program prasadum
+      use py_invisible_globals               ==> modules not visible to python
+      use py_visible_globals                 ==> modules     visible to python
+      implicit none      
+
+      real(kind=rdp)    :: t1, t2            ==> to time the code
+      call time_check(t1)
+      call system('rm -rf ../Outputs/*.*')   ==> flush Output folder
+      call deallocate_variables()
+      call assign_constants()                ==> set zero, one, etc
+      call set_defaults()                    ==> in case file not found
+      call read_program_inputs()             ==> read input files
+      call preprocessor()                    ==> setup trim/lin/integ
+      call perform_trim()                    ==> steady flight
+      call extract_lin()                     ==> stability analysis
+      call time_march()                      ==> maneuver time integ.
+      call time_check(t2)
+      write(6,100); write(6,101) t2- t1 ; write(6,100); write(6,*)
+      call deallocate_variables()            ==> flush allocatable arrays
+ 100  format(73('-'))
+ 101  format(10x,'TOTAL WALL CLOCK TIME',11x,':',F10.2,5x,'SECONDS')
+      end program prasadum      
+\end{Verbatim}
+While the source code in the main program looks ridiculously simple, remember that it is only a framework to organize the logic. Each of the calls involve varying levels of nested calls to other routines, and are not immediately obvious upon inspection. To use an interactive map of the code flow, open the file \textbf{Autodoc/code\_flow/html/index.html} : generated by the profiler ``Doxygen''. A call graph of the main program is shown below. The ``calling routine'' (source of the arrow) requires information from the ``dependency'' (where the arrow head points). Reading from left to right indicates a dependency, but reading from top to bottom in a column does not indicate the order of operations! While nested dependencies stretch quite far, the main program calls seven ``top-level'' routines. These routines, together with their dependencies, are detailed in the following sections.
+\begin{Figure}
+ \centering
+ \includegraphics[width=1.1\linewidth]{images/prasadum_callgraph.png}
+ \captionof{figure}{Call Graph of Main Program - as you can see, there is more to it than initially meets the eye. Routines highlighted in red borders indicate that there are nested dependencies, excluded from this tree for aesthetic reasons. }
+ \label{fig:mpcg}
+\end{Figure}
