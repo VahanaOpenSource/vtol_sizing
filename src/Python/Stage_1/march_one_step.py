@@ -21,7 +21,6 @@ class _march_one_step:
 
    def march_one_step(self,itercount):
 
-
 #====================================================================
 # assign local pointers for easy addressing
 #====================================================================
@@ -30,6 +29,8 @@ class _march_one_step:
       mission                       = self.mission
       wing                          = self.wing
       prop                          = self.prop
+      g                             = self.constants.grav
+      kts2mps                       = self.constants.kts2mps
       emp                           = self.emp_data.Tech_factors
       aircraft                      = self.all_dict['aircraft']
       techfac_fus                   = emp.Weight_scaling.fuselage
@@ -48,7 +49,7 @@ class _march_one_step:
 
       old_takeoff_mass     = copy.copy(self.massTakeoff)
       old_payload_mass     = copy.copy(mission.payload)
-      # print(old_takeoff_mass);x=input('ok?')
+
 #====================================================================
 # March through the different segments of the missiong
 # The output of each segment is the mass of fuel used, power required
@@ -63,6 +64,30 @@ class _march_one_step:
 #====================================================================
 # Flags to decide whether to do both sizing & performance, or only
 # performance (False)
+#====================================================================
+
+      update_c    = True               # perform cruise sizing + performance calculations
+
+#====================================================================
+# First perform sizing for the wings
+#====================================================================
+
+      for i_priority in range(nseg):
+         iseg              = mission.sizing_order[i_priority]
+         segment           = mission.segment[iseg]
+
+#====================================================================
+# for cruise: size the wings based on expected take-off weight
+# for the first cruise segment
+#====================================================================
+
+         if(segment.flightmode == 'cruise' and update_c and segment.type != 'reserve'):
+            W              = self.massTakeoff*g
+            temp1, temp2   = wing.cruise_sizing(W, segment, update_c)
+            update_c       = False 
+
+#====================================================================
+# Reset sizing switches
 #====================================================================
 
       update_h    = True               # perform hover sizing + performance calculations
@@ -118,7 +143,7 @@ class _march_one_step:
 # segments weights (engines.py)
 #====================================================================
 
-         self.updateFuelAndSegmentWeight(i)
+         self.updateFuelAndSegmentWeight(i, i_priority)
 
 #====================================================================
 # evaluate the total quantity of fuel used and
@@ -211,25 +236,22 @@ class _march_one_step:
          massPayload                      = self.massTakeoff - self.massempty - massFuelTotal - self.mass_battery
          error                            = abs(massPayload - old_payload_mass)/(old_payload_mass+0.01)
          mission.payload                  = massPayload     
-#         print('ok?',self.massTakeoff,self.massempty,massPayload)
 
 #=============================================================================
 # for negative payload, identify Chewbacca designs
 #=============================================================================
 
-         if massPayload < 1.e-3:
-            icontinue               = 0
-            self.errmsg             = 'negative payload'
+#         if massPayload < 1.e-3:
+#            icontinue               = 0
+#            self.errmsg             = 'negative payload'
 
 #=============================================================================
 # if design is converged but blade design is infeasible, trigger flag to
 # discontinue iterations
 #=============================================================================
 
-      if(error <= 0.001):
-         icontinue = 0
-         print ('Invalid design: blade stresses too high')
-         self.valid  = False
+#      print('error is ',error,massPayload,old_payload_mass)
+
 #====================================================================
 # run only one iteration if sizing eVTOL with no payload drop during 
 # mission, when in fixed take-off weight mode; don't need more!
@@ -243,7 +265,6 @@ class _march_one_step:
 #====================================================================
    
       converged  = self.check_converged(error, itercount, icontinue)
-
       return converged
 
 # ############################################################################

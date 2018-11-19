@@ -38,6 +38,7 @@ import cruise
 import extract_summary_data
 import hover
 import idle
+import flat_plate_buildup
 import pbmodel, bemt_performance
 from segment               import all_segments 
 from component_classes     import prop_sizing, constants, wings 
@@ -62,7 +63,8 @@ class hydraInterface(loops                  . _loops,
                      extract_summary_data   . _postprocessor, 
                      hover                  . _hovermodel,
                      idle                   . _idlemodel,
-                     bemt_performance       . _bemt_model):
+                     bemt_performance       . _bemt_model,
+                     flat_plate_buildup     . _find_f):
    """
    hydraDriver class to provide Python API calls
 
@@ -120,22 +122,42 @@ class hydraInterface(loops                  . _loops,
 #initialize classes for rotor and wing sizing information
       self.constants    = constants()
       # print 'initializing wing',all_dict['sizing']['Wings']
-      self.wing         = wings(all_dict['sizing']['Wings'], self.mission.nseg)
       self.prop         = prop_sizing(ad['aircraft'])
-      self.rotor        = rotors(all_dict['sizing']['Rotors'], self.mission.nseg)
       self.motor        = motors(all_dict['empirical']['Motors'], self.mission.nseg)
+      self.rotor        = rotors(all_dict['sizing']['Rotors'], self.mission.nseg)
+      self.wing         = wings(all_dict['sizing']['Wings'], self.mission.nseg)
 
 #====================================================================
 # Create connections to remember rotor -> wing and rotor -> motor maps
 #====================================================================
 
       self.map_all(all_dict['config'])
-      self.bemt_mode    = 0
+      
+#====================================================================
+# find number of tilting rotors, edgewise rotors and cruise propellers
+#====================================================================
+
+      for i in range(self.wing.ngroups):
+
+         rgid           = self.wing.groups[i].rotor_group_id 
+         group          = self.rotor.groups[rgid]
+
+         nrotors        = self.wing.groups[i].nrotors
+         if group.type == 'tilting':
+            self.rotor.ntilt     = self.rotor.ntilt + nrotors
+         elif group.type == 'lift':
+            self.rotor.nlift     = self.rotor.nlift + nrotors 
+         elif group.type == 'cruise':
+            self.rotor.ncruise   = self.rotor.ncruise + nrotors
+         else:
+            print('CRITICAL ERROR: unknown rotor type - ',group.type)
+            quit('valid types are tilting, lift or cruise')
 
 #====================================================================
 # perform some pre-processing
 #====================================================================
       
+      self.bemt_mode    = 0
       self.first_init()      
       self.kick_off()
 
@@ -305,14 +327,6 @@ class hydraInterface(loops                  . _loops,
       with open(self.fname,'a') as f:
          write_to_file(com, self.summary, f)
       
-#====================================================================
-# get empty group weights
-#====================================================================
-
-   def getEmptyWeightGroup(self):
-
-      return self.massEmptyGroup
-
 #====================================================================
 # clean up memory: right now, only FEA has allocatable memory,??
 # what about old sizing code?

@@ -24,7 +24,7 @@ class _set_inputs:
         ops               = obj(ad['operations'])
         init_cost         = ad['purchase']
         beta_factors      = init_cost['Beta_acq_factors']
-        self.costs        = costs(ops, init_cost, beta_factors, self.mission.duration, \
+        self.costs        = costs(ops, init_cost, beta_factors, self.mission.cost_duration, \
         					self.rotor.nrotors)
         self.wt_redund    = ad['redund']
 

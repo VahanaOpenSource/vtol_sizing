@@ -41,7 +41,7 @@ class _hovermodel:
 # get mass of system from end of previous segment
 #====================================================================
 
-   if (segID > 1 and not mission.span_driven):
+   if (segID > 1):
       massSegmentPrev      = mission.segment[iseg-1].mass
    else:
       massSegmentPrev      = self.massTakeoff
@@ -99,7 +99,7 @@ class _hovermodel:
 
 #      print('segment # ',iseg,thrust)
       if do_sizing:                                   # perform sizing calculations
-         rotor_group.hover_sizing(thrust, rho, Rmax, self.wing.groups, clearance, bfus)
+         rotor_group.sizing(thrust, rho, Rmax, self.wing.groups, clearance, bfus)
          rotor_group.ainf        = mission.segment[iseg].ainf 
 
 #====================================================================

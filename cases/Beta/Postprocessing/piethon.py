@@ -24,6 +24,6 @@ else:
 # draw pie charts
 #====================================================================
 
-   design.render_plots(-30)
+   design.render_plots()
 
 

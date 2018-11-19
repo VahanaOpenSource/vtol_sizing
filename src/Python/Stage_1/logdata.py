@@ -98,7 +98,7 @@ class _logdata:
 
       wing=self.wing
 
-      if wing.nwings > 0:
+      if wing.ngroups > 0:
          f.write('Wings:\n')
          for i in range(wing.ngroups):
             group    = wing.groups[i]
@@ -189,7 +189,6 @@ class _logdata:
 #==============================
 # fuel & payload
 #==============================
-
 #      print self.battery_wt
       m_f   = self.mass_fuel
       m_b   = self.mass_battery
@@ -220,7 +219,6 @@ class _logdata:
       f.write('\nParasitic_drag:\n')
       f_vehicle      = self.f_plate
       f.write("   {:20s} {:.3f} # [sq.m] \n"  .format('flat_plate_area:', f_vehicle))
-      temp           = std.m2f * std.m2f
       if adict['fdrag'] == 0:
 
          f.write("   {:20s} \n"  .format('flat_plate_breakdown:'))
@@ -228,7 +226,7 @@ class _logdata:
          for key in sorted(all_f.keys()):
             this_f = all_f[key]
             if(this_f > 1.e-3 and key != 'total'):
-               f.write("      {:16s}: [{:5.1f}] # [%]\n".format(key,this_f/(f_vehicle*temp)*100))
+               f.write("      {:16s}: [{:5.1f}] # [%]\n".format(key,this_f/(f_vehicle)*100))
 
 # ===================================================================
 # mission data
@@ -360,8 +358,10 @@ class _logdata:
 
       f.write("   {:20s} [".format('segment_mass:' ))
       f.write('{:10.1f} '.format(self.massTakeoff))
+      # print(self.massTakeoff)
       f.write(',')
       for n in range(nsegments-1):
+         # print(m.segment[n].mass)
          f.write('{:10.1f} '.format(m.segment[n].mass ))
          if n < nsegments-2:
             f.write(',')
@@ -398,7 +398,7 @@ class _logdata:
                f.write(',')
          f.write('] #[lb/hp-hr]\n')
 
-#=================== 
+#===================
 #battery properties
 #=================== 
       

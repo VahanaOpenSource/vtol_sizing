@@ -49,7 +49,7 @@ class _engines:
 # wrapper function
 #====================================================================
 
-   def updateFuelAndSegmentWeight(self,segID):
+   def updateFuelAndSegmentWeight(self,segID,i_priority):
 
       iseg = segID - 1
 
@@ -191,7 +191,7 @@ class _engines:
 # update mass segment
 #====================================================================
 
-      if (segID > 1):
+      if (segID > 1 and i_priority >= 0):
          massSegmentPrev      = mission.segment[iseg-1].mass
       else:
          massSegmentPrev      = self.massTakeoff
@@ -209,7 +209,7 @@ class _engines:
 #====================================================================
 
       mission.segment[iseg].mass = massSegmentPrev - massFuel + addPayload
-
+      # print(segID,massSegmentPrev,mission.segment[iseg].mass)
 #====================================================================
 # if weight changes over mission profile, remember this fact
 # it will decide how many times we iterate for convergence 

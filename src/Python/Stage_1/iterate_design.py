@@ -52,7 +52,7 @@ class _iterate_design:
 #====================================================================
          
          try:
-            M0                =  self.all_dict['aircraft']['guess_weight']
+            M0                =  self.mission.guess_weight
          except:
             M0                = 6.0*mission.payload_tar     
 
@@ -138,7 +138,7 @@ class _iterate_design:
 
       mission.sizing_mode     =  2 
       mission.gtow_target     = M
-      self.massTakeoff        = mission.mass_takeoff_guess()
+      self.massTakeoff        = M# mission.mass_takeoff_guess(M)
       self.converge_mode_2(blade, run_CSD)
 
 #====================================================================

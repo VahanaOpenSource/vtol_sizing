@@ -67,7 +67,7 @@ class _empty_weight:
 
         powerplant      = self.getEngineWeight()
 
-        l_fus           = 6.0/0.3048              # in feet
+        l_fus           = 0.5*wing.max_span
 
 #====================================================================
 # calculate costs of battery and motor
@@ -92,7 +92,6 @@ class _empty_weight:
                    'pwr_installed' : p_ins * kw2hp,
                    'vdive'         : 1.3*Vmax,
                    'wingarea'      : wing.area * m2f * m2f,
-                   'nwing'         : wing.nwings      ,
 #                   'wing_chord'    : wing.chord * m2f     ,
                    # 'wing_AR'       : wing.aspectratio     ,
                    'wing_tip_wt'   : self.wingtip_mass*kg2lb,
@@ -172,11 +171,10 @@ class _empty_weight:
 #====================================================================
 
         Volume            = 0.0
-#        fuselage          = fuselage_weight(vparams)
         fuselage          = fuselage_v2(vparams)
         Volume            = Volume + fuselage['total']/1400.0 
 
-        alighting         = alighting_weight(vparams)
+        alighting         = alighting_weight(self.massTakeoff, tech_factors)
 
 #=============================================================================
 # Flight controls: accounted for in "avionics" (common equipment weight)
@@ -249,11 +247,12 @@ class _empty_weight:
             quit('CRITICAL ERROR: PROGRAM TERMINATING')
 
 #====================================================================
-# Wing weight model: use AFDD model
+# Wing weight model: size for target frequency
 #====================================================================
 
+        empennage       = empennage_weight(wing, tech_factors)
+
         wing_wt, wires  = fixed_wing_wt(vparams)
-        empennage       = empennage_weight(vparams, wing_wt)
 
 #====================================================================
 # collect empty weights into dictionary of dictionaries; all kgs
@@ -272,7 +271,7 @@ class _empty_weight:
                            'powerplant'     : powerplant, 
                            'common_equip'   : aircraft['common_equipment']*self.wt_redund['avionics'],
                            'avionics'       : aircraft['avionics'],
-                           'emergency_sys'  : emergency_sys(vparams),
+                           'emergency_sys'  : emergency_sys(self.massTakeoff),
                            'wires'          : wires}
 #        print(aircraft['common_equipment']);quit()
 #        for k,v in sorted(massEmptyWeight.items()):

@@ -88,10 +88,10 @@ class _postprocessor:
 # $/vehicle, $/year, $/flight hour
 #=========================================================================   
 
-   self.costs.mass_scaling_elements(self.massTakeoff, self.massEmptyGroup)
+   self.costs.mass_scaling_elements(self.massTakeoff, self.massEmptyGroup, self.massempty)
    self.costs.power_scaling_elements(self.p_ins)
    self.costs.rotor_acq_cost(self.rotor.groups)
-   self.costs.cost_accumulation(self.engine.E_operations)
+   self.costs.cost_accumulation(self.engine.E_operations, self.massempty, self.engine.Eins)
 
 #=========================================================================   
 # calculate operating cost of vehicle in USD/flight hour

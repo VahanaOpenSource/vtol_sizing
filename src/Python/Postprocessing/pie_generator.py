@@ -211,7 +211,7 @@ class breakdown:
 # This function creates a pie chart for flat-plate area breakdown
 #====================================================================
 
-   def flat_plate_breakdown(self,angle): 
+   def flat_plate_breakdown(self,angle=30): 
 
       f                 = self.drags
       ftot              = float(f['flat_plate_area'])
@@ -223,10 +223,10 @@ class breakdown:
          return 
       labels            = []
       values            = []
-      expl_val          = 0.1
+      expl_val          = 0.01
 
 #====================================================================
-#loop over all elements in acquisition cost
+#loop over all elements in drag
 #====================================================================
 
       for key,v in f_details.items():
@@ -240,9 +240,10 @@ class breakdown:
 
       fname             = 'parasitic_drag_design_' + str(self.id) + '.png'
       t1                = 'Equivalent flat-plate area = ' + str(round(ftot,3)) + \
-                          'sq.m: breakdown (wings not included)'
+                          ' sq.m: breakdown (wings not included)'
       data              = {'values':values,'labels':labels}
-      self.draw_pie(data,fname,expl_val,t1,angle)      
+      string_val        = str(round(ftot,3)) + ' m$^2$'
+      self.draw_pie(data,fname,expl_val,t1,string_val,angle)      
 
 #====================================================================
 # This function creates a pie chart for acquisition cost breakdown
@@ -298,7 +299,8 @@ class breakdown:
       Total             = float(self.costs['Frame_acquisition'][0])*1e6
       t1                = 'Acquisition cost breakdown'
       data              = {'values':values,'labels':labels,'expl':expl}
-      self.draw_pie(data,fname,0.2,t1,'\\textdollar'+str(int(Total)),angle)      
+      if(len(values) > 1):
+         self.draw_pie(data,fname,0.2,t1,'\\textdollar'+str(int(Total)),angle)      
 
 #====================================================================
 # calculate miscellaneous percentages
@@ -382,8 +384,8 @@ class breakdown:
 
          self.pdf  = pdf 
          self.weights_pie(angle)
-         self.var_cost_pie(0)
-         self.fixed_cost_pie(0)
-         self.acqusition_pie(0)
-         self.flat_plate_breakdown(0)
+         self.var_cost_pie(angle)
+         self.fixed_cost_pie(angle)
+         self.acqusition_pie(angle)
+         self.flat_plate_breakdown(angle)
          print('completed pie chart generation; saved to ',fname)

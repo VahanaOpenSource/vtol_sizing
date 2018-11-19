@@ -14,17 +14,16 @@ f_fa 	= 0.015 	  # fairing weight / vehicle weight, fraction
 W_S     = 1.0
 
 from conversions import *
-def alighting_weight(vehicle_parameters, bfile=None):
+def alighting_weight(mass, tech_factors):
 
-   gtow       = vehicle_parameters['gtow']      # in lbs
-   fac        = vehicle_parameters['tech_factors'].landing_gear
+   fac        = tech_factors.landing_gear
 
 #====================================================================
 # fractional weight based on max GTOW:
 #====================================================================
 
-   mass_lg    = gtow*f_lg*fac*lb2kg
-   mass_fair  = gtow*f_fa*lb2kg
+   mass_lg    = mass*f_lg*fac
+   mass_fair  = mass*f_fa
    total 	  = mass_lg + mass_fair
    wght_lg 	  = {'gear_structure':mass_lg, 'fairing': mass_fair, 'total': total}
    return wght_lg

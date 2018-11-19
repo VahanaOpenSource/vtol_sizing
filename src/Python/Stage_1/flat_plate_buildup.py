@@ -11,77 +11,44 @@
 #   protruberances,             ==> add 15% to final answer
 #   interference,               ==> add 20% to each part if not explicitly specified
 #   roughness                   ==> increase Cf by 20%
+#
+# Inputs
+#   V = flight speed in m/s
+# 
 #=============================================================================
 from numpy import pi, sqrt, log10, exp, log, cos
-
-def find_f(inputs):
+from conversions import kg2lb, lb2kg, f2m,kts2mps
+class _find_f:
+ def find_f(self, V):
 
 #=============================================================================
 # unpack inputs
 #=============================================================================
 
-    W         = inputs['W']                 # weight, lbs
-    R         = inputs['R']                 # rotor radius, ft  
-    Vcruise   = inputs['V']                 # cruise speed, kts
-    Pins      = inputs['P']                 # installed power, hp
-    Nb        = inputs['Nb']                # number of blades
+    df        = self.emp_data.Geometry.fuselage_width 
+    lf        = self.wing.max_span*0.5
     f_all     = {}
-
-#=============================================================================
-# revert to defaults if some details not given 
-#=============================================================================
-
-    try:
-        lf      = inputs['lf']
-    except:
-        lf      = 20.e0                      # fuselage length, ft
-
-    try:
-        NR      = inputs['NR']
-    except:
-        NR      = 1
-
-    try:
-        config  = inputs['config']
-    except:
-        config  = 1                     # single main rotor
-
-    try:
-        nengine = inputs['nengine']
-    except:
-        nengine = 1
-
-    try:
-        N_at    = inputs['Nprop']
-    except:
-        N_at    = 0 
+    Af        = pi*df*df                     # mean cross-section area, sq ft
+    fine      = lf/df                        # fineness ratio
+    W         = self.massTakeoff*2.2         # weight in lbs 
 
 #=============================================================================
 # fuselage and pylon drag
 #=============================================================================
 
-    nu        = 1.72e-4                     # kinematic viscosity, ft^2/s
-    a         = 1115.0                      # speed of sound, ft/s
-    V         = Vcruise*1.689               # ft/s
+    nu        = 1.48e-5                     # kinematic viscosity, m^2/s
+    a         = 340.0                       # speed of sound, m/s
     M         = V/a                         # cruise mach number    
-    rho_pack  = 0.40                        # packing density: 20% of aluminum
-    Af        = W/(7.2)/32.2/rho_pack       # equivalent cross-section area
-
-#    Af        = 26.5/16000.0*W             # frontal area, sq.ftL scale it with uh60
-    df        = 2.0*sqrt(Af/pi)*1.3         # equiv. diameter,, ft
-    fine      = lf/df                       # fineness ratio
     Re        = V*lf/nu                     # Reynolds number for fuselage length
-    Cf        = 0.455/(log10(Re)**2.58 * (1+0.144*M*M)**0.65)
+    Cf        = 0.455/(log10(Re)**2.58 * (1+0.144*M*M)**0.65)       # skin friction coefficient
 
 #calculate form factor
     FF        = 1.05 + 0.001*fine + 1.5/fine**1.5 + 8.4/fine**3
 
 #interference factor and extra rivets
-    Fint      = 1.2
-
-    Swet      = lf*df*4 + df*df
-
-    f_fus     = Cf*FF*Fint*Swet     
+    Fint      = 1.0
+    Swet      = lf*df*4 + df*df             # wetted area, sq.m
+    f_fus     = Cf*FF*Fint*Swet             # fuselage flat-plate area, sq.m
 
     f_all['fus'] = f_fus
 
@@ -89,13 +56,10 @@ def find_f(inputs):
 # contraction length
 #=============================================================================
 
-    try:
-        lc    = inputs['lc']                    # length of contraction region, ft
-    except:
-        if V <= 160:                            # for utility, make it less streamlined
-            lc    = df*0.6
-        else:
-            lc    = 2.0*df                      # otherwise reduce base drag
+    if V <= 82:                             # for utility, make it less streamlined
+        lc    = df*1.5
+    else:
+        lc    = 2.0*df                      # otherwise reduce base drag
 
 #=============================================================================
 #fuselage upsweep and contraction
@@ -106,31 +70,38 @@ def find_f(inputs):
     f_all['base'] = df_cont
 
 #=============================================================================
-# tilt-rotors, tilt-wings or tail-sitters
+# Loop over rotor groups
 #=============================================================================
 
-    if config == 2 or config == 5:              # need to account for pylon drag  
-                                                # combine with spinner
-#single engine: spinner only covers drive system
-        rspin           = 0.12
-        Sf              = rspin*R
-        Sf              = pi*Sf*Sf*NR              # frontal area
-        f_nac           = Sf*0.05                  # drag coefficient with spinner head
-        f_all['nac']    = f_nac
-#        print(NR,f_nac/NR/0.05/0.3048**2)
-    else:
+    rotor           = self.rotor 
+    ngroups         = rotor.ngroups
+    f_all['spin']   = 0.0
+    f_all['hubs']   = 0.0
+    for i in range(ngroups):
+        group           = rotor.groups[i]
+        radius          = group.radius
+        NR              = group.nrotors
+        Nb              = group.nblade
 
 #=============================================================================
-# auxiliary thrusters for smr configuration
+# Tilting rotors
 #=============================================================================
 
-        R_at            = 0.2*R                 # thruster radius
-        rspin           = 0.2                   # spinner to rotor radius ratio
-        Sf              = pi*(rspin*R_at)**2    # frontal area, sq.ft
-        CD              = 0.2                   # drag coefficient of spinner
-        f_nac           = Sf*CD*N_at            # spinner flat-plate area
-        f_nac           = f_nac * 1.2           # add 20% for interference
-        f_all['spin']   = f_nac                 # book-keep it in nacelle area
+        if group.type == 'tilting':
+            rspin           = 0.12*radius
+            Sf              = pi*rspin*rspin           # reference area of spinner
+            f_spin          = Sf*0.12                  # drag coefficient with spinner head
+            f_all['spin']   = f_all['spin'] + f_spin*NR
+
+#=============================================================================
+# main rotor hub drag: combination of center section, pitch housing, 
+# blade grip and root fittings; pitch links are there but small effect overall
+#=============================================================================
+
+        else:
+            fhub          = radius*radius*(6e-4 + 0.0022225*Nb)
+            fhub          = 1.2*fhub                             #20% interference
+            f_all['hubs'] = f_all['hubs'] + fhub*NR
 
 #=============================================================================
 # momentum drag at higher speeds (> 160 knots)
@@ -147,12 +118,7 @@ def find_f(inputs):
 #landing gear outside
 #=============================================================================
 
-    try:
-        gear_type   = inputs['gear_type']
-    except:
-        gear_type   = 'skids'
-
-
+    gear_type   = 'skids'
     if gear_type == 'outwheel':
         slope     = 0.443008 if W > 1000.0 else 0.0
         y0        = 0.57549
@@ -170,29 +136,24 @@ def find_f(inputs):
     else:
         quit('unknown landing gear type')
 
-#    print(fLG, gear_type )
+#=============================================================================
 #assume the above equations hold up to 1000 lbs. 
 #below 1000 lbs, linearly scale up with weight up to asymptote
-    if W < 1000:
-        fLG       = fLG * (W/1000.0)
+#    if W < 1000:
+#        fLG       = fLG * (W/1000.0)
+#=============================================================================
 
-    fLG           = fLG*0.62
-    f_all['LG']   = fLG
-
+    fLG           = fLG*0.3048*0.3048      # convert to sq.m
+    f_all['LG']   = fLG#*0.65               # effect of fairings
+    # print(W,fLG)
 #=============================================================================
 # horizontal/vertical stabilizers
 #=============================================================================
 
-    try:
-        S_ht      = inputs['S_ht']          # h tail area, sq ft 
-    except:
-#        S_ht      = 0.01 * (W / 16000)      # horizontal tail area
-        S_ht      = 0.0
-
-    try:
-        S_vt      = inputs['S_vt']
-    except:
-        S_vt      = 25.9 * (W / 1620)       #   vertical tail area, sq.ft
+    S_ht          = 0.001
+    S_vt          = 1.2                    # Vtail area, sq.m
+#    print('add vtail area for drag calculation')
+#    S_vt          = 25.9 * (W / 1620)       #   vertical tail area, sq.ft
 
 #calculations below
     AR            = 2.5                     # aspect ratio
@@ -274,30 +235,6 @@ def find_f(inputs):
 #not needed for electric motors; air cooled by free stream or downwash
     dfe             = 0.0
     f_all['cool']   = dfe
-#=============================================================================
-# main rotor hub drag
-# combination of center section, pitch housing, blade grip and root fittings
-# pitch links are there but small effect overall
-#=============================================================================
-
-    if config == 1 or config == 3:                      # edgewise configuration
-        fhub          = 6e-4*R**2 + 0.0022225*Nb*R**2 
-        fhub          = 1.2*fhub
-        f_all['hub']  = fhub                        # 20% interference
-    else:
-        fhub          = 0.0
-
-#=============================================================================
-# tail rotor for smr configurations: take R = 0.2 R_MR and Nb = 4
-#=============================================================================
-
-    if config == 1:
-        Nb            = 4
-        fTR           = 0.005*(0.2*R)**2*(1+2*Nb)
-        fTR           = 1.2*fTR
-        f_all['TR']   = fTR
-    else:
-        fTR           = 0.0
 
 #====================================================================
 # Add cylinder mast drag for coaxial
@@ -305,23 +242,66 @@ def find_f(inputs):
 # Frontal area from 0.2 R spacing, cyl. diameter of 0.075 R
 #====================================================================
 
-    quit('OK?')
-    if (aircraftID == 3):
-        delta_f     = 0.2*0.075*0.2*rotor.radius*rotor.radius
+#    if (False):
+#        delta_f     = 0.2*0.075*0.2*rotor.radius*rotor.radius
 
 #=============================================================================
 # add up everything, throw in another 10% for protruberances
 #=============================================================================
 
-    total           = f_ht + f_vt + fLG + f_fus + fhub + fTR + f_nac + f_mom + \
-                      df_cont + dfe 
-
-#    print(f_ht, f_vt, fLG, f_fus, fhub, fTR, f_nac, f_mom, df_cont, dfe)
+    total           = f_all['fus'] + f_all['base'] + f_all['spin'] + f_all['hubs'] + \
+                      f_all['ht']  + f_all['vt']   + f_all['LG']   + f_all['cool']
 
 #for high speed design, remove protrusions
-#    if V < 160:
-    f_all['prot']   = 0.05*total
-    total           = total + f_all['prot'] 
+    f_all['prot']   = 0.1*total
 
+    total           = total + f_all['prot'] 
     f_all['total']  = total
-    return f_all, Af*df
+    return f_all, Af*lf
+
+
+#====================================================================
+# wrapper function to calculate parasitic drag of the airframe
+# Inputs
+#   Vcruise    : Cruise speed, m/s
+#   update     : True/False flag to indicate whether to estimate 
+#                parasitic drag or not
+# Outputs:
+#   fParasitic : equivalent flat-plate area, sq.m
+#   Vol        : fuselage volume, cu.m #
+#====================================================================
+
+ def flat_plate_wrapper(self, segment, update):
+
+
+    aircraft            = self.all_dict['aircraft']
+    flatPlateFactor     = aircraft['fdrag'] 
+    add_f               = segment.add_f 
+    Vcruise             = segment.cruisespeed*kts2mps
+
+#====================================================================
+# Calculate from parametric equation (modified equation by AS)
+#====================================================================
+
+    if update:
+        fParasitic      = flatPlateFactor*(self.massTakeoff*kg2lb*1.e-3)**0.5e0*f2m*f2m
+      
+#====================================================================
+# estimate flat-plate area from component build-up 
+#====================================================================
+
+        if flatPlateFactor <= 1.e-3:
+            f_all, Vol     = self.find_f(Vcruise)
+            self.Volume    = Vol
+            f_all['ext']   = add_f                  # flat-plate area due to ext. stores
+            f_all['total'] = f_all['total'] + f_all['ext']
+            aircraft['f_breakdown']    = f_all
+            fParasitic                 = f_all['total']
+
+#====================================================================
+# update flat plate factor and flat plate area (remember in class)
+#====================================================================
+
+        self.f_plate                  = fParasitic
+
+    return None

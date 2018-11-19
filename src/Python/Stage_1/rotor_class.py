@@ -52,6 +52,7 @@ class motor_group:
       self.rotor_group_ids    = []      # which rotor groups are used to size this motor?
       self.p_ins              = numpy.zeros(nseg)
       self.nmotors            = 0
+
 #====================================================================
 # Rotor class that remembers parameters for sizing
 #====================================================================
@@ -63,10 +64,18 @@ class rotors:
       self.nrotors      = 0         # total rotor count in aircraft
       ngrp              = 0
       self.groups       = {}
+      self.ntilt        = 0 
+      self.ncruise      = 0
+      self.nlift        = 0
+      self.Atilt        = 0.0 
+      self.Acruise      = 0.0 
+      self.Alift        = 0.0 
 
-#loop over wing groups, find design parameters
+#====================================================================
+#loop over rotor groups, find design parameters
+#====================================================================
+
       for key in sorted(data):
-#remember # of wing groups
          self.groups[ngrp]  = rotor_group(data[key], key, nseg)
          ngrp               = ngrp + 1
 
@@ -75,7 +84,91 @@ class rotors:
       return None
       
 #====================================================================
-# Individual rotor groups are here
+# Python function to calculate blade drag in forward flight 
+# for edgewise rotors
+# Inputs
+#        Vcruise (m/s)
+#        VtipMax (m/s): maximum rotor section speed at advancing blade tip
+#        rho     (kg/cu.m): air density
+#
+# Outputs
+#        Blade_drag (Newtons)
+#====================================================================
+
+   def blade_drag(self, Vcruise, VtipMax, rho):
+
+#====================================================================
+# now loop over all rotor groups, and calculate rotor drag
+#====================================================================
+
+     Blade_drag           = 0.0
+
+     for i in range(self.ngroups):
+        group             = self.groups[i]
+        NR                = group.nrotors
+
+
+        Vtip              = group.tipspeed*group.RPM_ratio
+
+#====================================================================
+# edgewise rotor: get average profile drag coefficient of sections
+#====================================================================
+
+        if group.type == 'edgewise':
+           if group.tipspeed + Vcruise > VtipMax:
+              Vtip              = VtipMax - Vcruise
+              group.RPM_ratio   = Vtip/group.tipspeed
+           else:
+              Vtip              = group.tipspeed
+
+#====================================================================
+# find average section drag coefficient at different advance ratios
+#====================================================================
+
+           cd0                  = group.cd0
+           muCruise             = Vcruise/Vtip
+           if muCruise > 1.0:
+              cd0 = 1.5*cd0
+           elif muCruise > 0.3:
+              cd0 = cd0*(1.0 + (muCruise-0.3)/0.7e0)
+           else:
+              cd0 = cd0
+
+#====================================================================
+# find blade drag in wind direction
+#====================================================================
+
+           D_blade        = group.solidity*cd0/8.0*(3.1*muCruise)
+           D_blade        = D_blade * rho * group.area * Vtip*Vtip * NR
+
+           Blade_drag     = Blade_drag + D_blade 
+
+#====================================================================
+# tilting rotor: check helical tip mach number for limit
+#====================================================================
+
+        elif group.type == 'tilting':
+
+          Vmax               = sqrt(Vtip*Vtip + Vcruise*Vcruise)
+          if(Vmax > VtipMax):
+              Vtip = sqrt(Vmax*Vmax - Vcruise*Vcruise)
+
+          if Vtip < 0.2*group.tipspeed:
+             print ('warning: SLOWED ROTOR BELOW 20% RPM')
+             print ('hitting min limit: 20% HOVER TIP SPEED')
+             Vtip = 0.2*group.tipspeed
+
+#====================================================================
+# unknown rotor type
+#====================================================================
+
+        else:
+          quit('I dont know this rotor type')       
+
+     return Blade_drag
+
+#====================================================================
+# Individual rotor groups are contained in the class "rotor_group"
 #====================================================================
 
 class rotor_group:
@@ -142,7 +235,7 @@ class rotor_group:
 # size the rotor with either radius or disk loading
 #===============================================================================
 
-   def hover_sizing(self, thrust, rho, Rmax, wing_groups, clearance, bfus):
+   def sizing(self, thrust, rho, Rmax, wing_groups, clearance, bfus):
 
 #====================================================================
 # calculate radius from disk loading

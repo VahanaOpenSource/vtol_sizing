@@ -47,7 +47,7 @@ class costs:
 # take-off mass (given in kgs)
 #====================================================================
 
-   def mass_scaling_elements(self, massTakeoff, massEmpty):
+   def mass_scaling_elements(self, massTakeoff, massEmpty, total_empty_mass):
         
       cost              = self.acq_breakdown
       scaling           = self.Acquisition['Scaling_cost']
@@ -56,7 +56,7 @@ class costs:
 # final assembly, testing and BRS costs scale with weight
 #====================================================================
 
-      cost['final_assem_line'] = scaling['final_assem_line']*massTakeoff   # FAL
+      cost['final_assem_line'] = scaling['final_assem_line']*total_empty_mass
       cost['BRS']              = scaling['BRS']             *massTakeoff   # Ballistic recovery system 
 
 #====================================================================
@@ -152,7 +152,7 @@ class costs:
 # input is Emission - total battery charging energy to complete mission, kWh
 #====================================================================
 
-   def calc_variable_costs(self, Emission):
+   def calc_variable_costs(self, Emission, Etotal):
 
 #====================================================================
 # initialize memory
@@ -187,16 +187,23 @@ class costs:
 #====================================================================
 
       Ncycles                    = Battery.Cycles                 # number of charge/discharge cycles
-      rate_b                     = Battery.Cost_per_kwh           # $/kWh of energy            
-      var['battery_use']         = rate_b*Pavg/(Ncycles)          # battery operating cost, $/flight hour 
-    
+      rate_b                     = Battery.Cost_per_kwh           # $/kWh of energy
+
+#====================================================================
+# assume batteries go through one charge/discharge cycle per flight
+#====================================================================
+
+      cycles_per_hour            = 1.0/self.tmission              # tmission in hours
+      Flight_hours               = int(Ncycles/cycles_per_hour)   # flight hours that battery lasts for
+      var['battery_use']         = rate_b*Etotal/(Flight_hours)          # battery operating cost, $/flight hour 
+
       return None
 
 #=============================================================================
 # add up costs from different groups
 #=============================================================================
 
-   def cost_accumulation(self, Emission):
+   def cost_accumulation(self, Emission, massEmpty, Etotal):
 
 #====================================================================
 # Apply acquisition cost scaling factors going from Alpha -> Beta 
@@ -213,6 +220,7 @@ class costs:
 #=============================================================================
 
       self.acquisition        = dict_accumulation(self.acq_breakdown)   # total acquisition costs
+#      self.acquisition        = 550*massEmpty
 
 #=============================================================================
 # get fixed costs (yearly rate) => depends on acquisition costs
@@ -231,7 +239,8 @@ class costs:
 # get variable cost components 
 #=============================================================================
 
-      self.calc_variable_costs(Emission)                                # component build up
+#      print(Emission)
+      self.calc_variable_costs(Emission, Etotal)                        # component build up
       self.variable_costs     = dict_accumulation(self.var_breakdown)   # depends on mission
 
 #=============================================================================

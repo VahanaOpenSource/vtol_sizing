@@ -4,17 +4,19 @@
 # AIRCRAFT WING GROUP: 29-1.2 SECTION IN NDARC THEORY MANUAL V1_11.PDF, pg 249
 #
 # AFDD 93 Model implemented by AS
-# 
+# frequency-based sizing also implemented by AS
 #====================================================================
 
 f_LGloc     = 1.0                # 1.7247 if landing gear on wing, 1.0 otherwise
-k_elect     = 0.5 # proportionality constants
+k_elect     = 0.5                # proportionality constants for anti-icing weight
 k_rotor     = 0.5
+
+model       = 'statistical'
+#model       = 'target_freq'
 from conversions import *
 def fixed_wing_wt(vehicle_parameters):
 
    Wt       = vehicle_parameters['gtow']        # in lbs
-   nwings   = vehicle_parameters['nwing']       # number of fixed wings
    fac      = vehicle_parameters['tech_factors'].wing
    wing     = vehicle_parameters['wing']
    nr       = vehicle_parameters['nrotor']
@@ -58,7 +60,7 @@ def fixed_wing_wt(vehicle_parameters):
    str_cost    = 0.0
    # print(P);quit('ok?')
    # print(wing.ngroups)
-   if nwings > 0:
+   if wing.ngroups > 0:
       for i in range(wing.ngroups):
 
          group       = wing.groups[i]                 
@@ -67,9 +69,44 @@ def fixed_wing_wt(vehicle_parameters):
          Sw          = group.area * m2f * m2f         # in sq.ft 
          fL          = group.lift_frac                # wing lift fraction for this group (0 to 1)
          W           = fL*Wt/nwing                    # thrust carried by each wing, lbs; this is both wings together!
+
+#====================================================================
+# statistical method: AFDD model
+#====================================================================
          
-         wt          = 5.66411*f_LGloc* (W*0.001/cos(Lamda))**0.847 * (nz**0.3958) * (Sw**0.21754)        \
+         if(model == 'statistical'):
+            wt       = 5.66411*f_LGloc* (W*0.001/cos(Lamda))**0.847 * (nz**0.3958) * (Sw**0.21754)        \
                        *sqrt(Aw)* ((1.0+lamda)/tau_w)**0.09359 #* (1.0 - b_fold)**(-0.14356)
+
+#====================================================================
+# Physics-based methods
+#====================================================================
+
+         elif(model == 'target_freq'):
+            
+#====================================================================
+# torsion frequency first: use rotor/motor mass 
+# for approx. rotational inertia
+#====================================================================
+
+            rgid        = group.rotor_group_id 
+            nrotors     = group.nrotors/2          # number of rotors 
+
+
+            mgid        = rotor.groups[rgid].motor_group_id 
+
+#====================================================================
+# error trap
+#====================================================================
+         
+         else:
+            quit('wing weight model not available: CRITICAL ERROR in fixed wing weight model')
+
+#====================================================================
+# add up contributions from duplicate wings in this group
+# proceed with book-keeping operations
+#====================================================================
+
          wt          = wt * nwing
          wing_wt     = wing_wt + wt
          area        = area + Sw*nwing             # in sq.m
@@ -99,7 +136,7 @@ def fixed_wing_wt(vehicle_parameters):
    actuator_wt       = actuator_wt * red['wing_flap']
 
 #====================================================================
-# tilt actuators
+# tilt actuators: 10% of mass of wing
 #====================================================================
       
    tilt_wt        = 0.1*wing_wt*red['tilt_actuator']

@@ -73,7 +73,7 @@ Empirical:
          eta:               0.85
 
       Body:
-         flat_plate_factor: 0.88       # means use drag build-up model
+         flat_plate_factor: 0.00       # means use drag build-up model
 
 # Geometry parameters
    Geometry:
@@ -145,8 +145,8 @@ Operations:
       Rotor_inspection:       0.375          # $/hr/rotor 
       Motor_inspection:       0.375          # $/hr/rotor 
    Battery: 
-      Cycles:              1000
-      Cost_per_kwh:         250               # battery unit cost per unit energy capacity, $/kWh
+      Cycles:               600
+      Cost_per_kwh:         379               # battery unit cost per unit energy capacity, $/kWh
       Electricity:            0.165           # electricity cost per unit energy, $/kWh
 
 Redundancies:

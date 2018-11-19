@@ -122,7 +122,7 @@ for icom,com in enumerate(all_combinations):
     x.modify_case(com)
     x.run_hydra()
     x.write_summary(com)
-    print ("\n - Rank %3d, Case: %7d of %7d ..... " %(com['rank'],icom,ncases),x.errmsg)
+    print ("\n - Rank %3d, Case: %7d of %7d ..... " %(com['rank'],icom,ncases-1),x.errmsg)
     if x.valid:
       x.writeLogData(icom)
       valid_count     = valid_count + 1

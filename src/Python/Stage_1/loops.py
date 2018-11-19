@@ -91,12 +91,12 @@ class _loops:
 
 
          for key,value in svars.items():
-            # print(key,self.mission.span_driven)
 
 #=======================================================================
 # for span-driven rotor sizing, remove disk loading and radius from 
 #=======================================================================
-            if self.mission.span_driven and (key == 'radius' or key == 'DL' or key == 'disk_loading'):
+
+            if grp.span_driven and (key == 'radius' or key == 'DL' or key == 'disk_loading'):
                print('AHA! found you! I will not include this value in sizing loops: ',key)
             else:
                st1         = st.lower() + '_' + key 
@@ -123,8 +123,10 @@ class _loops:
             st1            = st.lower() + '_' + 'flap_freq'
             all_lists[st1] = fl_freq
 
-         if 'radius' not in svars and 'DL' not in svars and not self.mission.span_driven:
-            quit('ERROR: MUST SPECIFY ROTOR_RADIUS or DISK_LOADING')
+         if 'radius' not in svars and 'DL' not in svars:
+            pref           = st.lower()
+            print(st.lower(),' has neither radius nor disk loading specified: ')
+            print('span driven option chosen to size this rotor group')
 
 #=======================================================================
 # cruise rpm ratio 
@@ -252,10 +254,7 @@ class _loops:
          elif('DL' in rotor):
             class_group.set_DL       = True 
          else:
-            if(self.mission.span_driven):
-               class_group.span_driven   = True 
-            else:
-               quit('dunno how to size the rotor just yet..')
+            class_group.span_driven  = True 
 
          if('Vtip' in rotor):
             class_group.set_Vtip     = True 

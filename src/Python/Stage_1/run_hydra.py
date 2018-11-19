@@ -49,7 +49,6 @@ class _run_hydra:
 #======================================================================
 
       mission           = self.mission
-      mission.reset_segments()
       self.massTakeoff  = mission.mass_takeoff_guess()
       
 #======================================================================
@@ -64,6 +63,8 @@ class _run_hydra:
    
       this_blade     = {}
       self.iterate_design(this_blade, False) 
+
+      mission.reset_segments(self.massTakeoff)
 
 #====================================================================
 # for BEMT calculations, calculate power for a given thrust
@@ -169,13 +170,19 @@ class _run_hydra:
          Wing           = aircraft['wing'][k2]
          w              = wing.groups[i]
 
-         w.oswald       = emp_wings.oswald
-         w.cd0          = emp_wings.cd0
-
          w.aspectratio  = Wing['aspectratio']
+         w.oswald       = emp_wings.oswald
+
+#====================================================================
+# calculate oswald efficiency factor if given as zero
+#====================================================================
+
+         if w.oswald == 0.0:
+            w.oswald    = 1.0/(1.05 + 0.007*numpy.pi*Wing['aspectratio'])
+
+         w.cd0          = emp_wings.cd0
          w.nwings       = Wing['nwing']
          w.cl           = Wing['cl']
-
          w.K            = 1.0/(numpy.pi*w.aspectratio*w.oswald)
 
 #====================================================================

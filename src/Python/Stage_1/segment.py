@@ -49,32 +49,30 @@ class all_segments:
          self.sizing_order.append(sizing_seg_id)
       for idval in non_sizing_seg_ids:
          self.sizing_order.append(idval)
+
+      self.cost_duration   = 0.0
       for i in range(n):
          self.segment[i]   = mission_segment(mission_data, i, payload)
 
          self.duration    += self.segment[i].time 
 
+         if(self.segment[i].type != 'reserve'):
+            self.cost_duration   = self.cost_duration + self.segment[i].time 
+            
 #====================================================================
 # see which segment comes first: cruise or hover
 # If cruise comes first, then do span-driven sizing of rotors
 # do not honor the rotor disk loading or radius inputs in that case
 #====================================================================
 
-      self.hover_first     = False
-      self.cruise_first    = False 
-      self.span_driven     = False 
-
       for i_priority in range(n):
          iseg       = self.sizing_order[i_priority]
          flt_mode   = self.segment[iseg].flightmode 
          if(flt_mode == 'hover'):
             print('\n CHOOSING CLASSICAL ROTORCRAFT SIZING: HOVER BEFORE CRUISE \n')
-            self.hover_first  = True 
             break
          else:
             print('\n CHOOSING E-VTOL STYLE SIZING: CRUISE BEFORE HOVER, SPAN-DRIVEN ROTOR RADIUS \n')
-            self.cruise_first = True 
-            self.span_driven  = True 
             break
 
 #====================================================================
@@ -90,18 +88,22 @@ class all_segments:
          self.payload            = payload
          self.payload_tar        = payload         # target payload
 
+      try:
+         self.guess_weight       = mission_data['guess_weight']
+      except:
+         pass 
+         
 #====================================================================
 # function to reset segment information
-# not yet activated! 
 #====================================================================
 
-   def reset_segments(self):
+   def reset_segments(self,massTakeoff=0.0):
       n                          = self.nseg 
 
       for i in range(n):
          segment              = self.segment[i]
          segment.fuel_mass    = 0.0e0
-         segment.mass         = 0.0e0
+         segment.mass         = massTakeoff
          segment.sfc          = 0.0e0
          segment.energy       = 0.0 
 
@@ -159,6 +161,14 @@ class mission_segment:
       except:
 #         print ('external stores not present for segment # ',j+1)
          self.add_f              =     0.0
+
+#====================================================================
+# if segment time is not given, or given as zero in cruise, use distance
+# and speed to calculate it 
+#====================================================================
+
+      if (self.flightmode == 'cruise' and self.time == 0):
+         self.time               = self.distance/(self.cruisespeed*1.853)*60
 
 #====================================================================
 # set default efficiencies for rotor in axial flight
