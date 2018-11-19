@@ -143,6 +143,7 @@ class hydraInterface(loops                  . _loops,
          group          = self.rotor.groups[rgid]
 
          nrotors        = self.wing.groups[i].nrotors
+
          if group.type == 'tilting':
             self.rotor.ntilt     = self.rotor.ntilt + nrotors
          elif group.type == 'lift':

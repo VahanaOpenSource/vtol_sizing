@@ -4,10 +4,9 @@
 #====================================================================
 import hydra
 
-from math                import atan2,isinf
 import sys, os
 from numpy import arctan2,cos,pi,sin,sqrt
-from conversions         import *
+#from conversions         import *
 
 #====================================================================
 
@@ -82,9 +81,9 @@ class _cruisemodel:
       print ('WARNING: initial guess was OFF! DUH..',iseg,massSegmentPrev, segment.fuel_mass)
       massSegmentPrev = 400.0
 
-   if isinf(massSegmentPrev):
-      massSegmentPrev = 1e5
-      quit ('ERROR: infinity triggered for mass')
+#   if isinf(massSegmentPrev):
+#      massSegmentPrev = 1e5
+#      quit ('ERROR: infinity triggered for mass')
 
 #====================================================================
 # set local atmospheric conditions
@@ -139,16 +138,6 @@ class _cruisemodel:
       print('Rotor vertical force gone!',FzRotor, Wings_lift,massSegmentPrev*grav)
       quit('BANG: LOGIC FAIL IN CRUISE')
 
-   alpha                = atan2(FxRotor, FzRotor)
-
-#====================================================================
-# < 15 deg tilt wrt vertical: add blade drag to horizontal force
-#====================================================================
-
-#   if (abs(alpha) < 15.0*pi/180.0):
-#      print('rotor force demands are ',FxRotor,FzRotor,massSegmentPrev*grav)
-#      quit('BANG: cruise.py line 350')
-
 #====================================================================
 # include effect of climb on shaft tilt
 #====================================================================
@@ -173,27 +162,31 @@ class _cruisemodel:
    for i in range(ngroups):
       group             = rotor.groups[i]
       NR                = group.nrotors 
+      rotor_fx          = FxRotor*group.Arat_thrust/NR
+      rotor_fz          = FzRotor*group.Arat_lift/NR
+      alpha             = arctan2(rotor_fz, rotor_fx) 
 
 #====================================================================
-# Tilting rotors and lifting wings: ideal!
+# cruise propellers, or tilting rotors operating within +/- 10 deg 
+# use propulsive efficiency parameter
 #====================================================================
 
-      if(group.type == 'tilting'and FzRotor <= 0.01*massSegmentPrev*grav):
+      if(group.type == 'tilting' or group.type == 'cruise') and alpha < 0.17:
          if use_bemt:
             eta         = group.rotor_aero_eta[iseg]
             quit('bang: need multi-rotor BEMT')
          else:
             eta         = effPropeller
-         rotorPower     = Total_thrust*Vcruise/eta       # in watts
-         rotorPower     = rotorPower*group.kint          # add rotor-rotor interference 
+         rotorPower     = rotor_fx*Vcruise/eta       # in watts
+         rotorPower     = rotorPower*group.kint      # add rotor-rotor interference 
 
 #====================================================================
 # edgewise rotors (including tilting type rotors in not-quite-axial flow)
 #====================================================================
 
       else:
-         print(group.type,FzRotor,Wings_lift)
-         quit('should not be here!')
+         print(group.type,rotor_fx,rotor_fz,Wings_lift)
+         quit('should not be here! cruise.py, edgewise rotors detected!')
          rotorPower     = hydra.rotorpower(Vcruise,  \
                              alpha, Total_thrust, cruise_tipspeed,rho,rotor.radius,rotor.solidity, rotor.cd0)
 
@@ -215,7 +208,7 @@ class _cruisemodel:
 # increment total shaft power
 #====================================================================
 
-      P_shafts          = P_shafts + rotorPower*NR_total 
+      P_shafts          = P_shafts + rotorPower*NR 
 
 #====================================================================
 # Time spent in cruise, SI (min)

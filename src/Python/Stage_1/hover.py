@@ -31,7 +31,6 @@ class _hovermodel:
    aircraftID     = aircraft['aircraftID'] 
    do_sizing      = update
    effHoverPower  = engine.eff_hover_power 
-   powerHoverAccs = engine.power_accs 
    self.engine.fracPowerMCP  = 1.0
 
    iseg           = segID - 1
@@ -121,7 +120,7 @@ class _hovermodel:
 # Total power in hover due to MR and accs.
 #====================================================================
 
-      rotor_power    = (Phover)*(1.0/effHoverPower + powerHoverAccs)
+      rotor_power    = (Phover)#*(1.0/effHoverPower + powerHoverAccs)
       engine_power   = rotor_power/eta_motor
 
 #====================================================================
@@ -135,7 +134,91 @@ class _hovermodel:
       wing_group.rotor_torque[iseg]   = Phover/omega         # torque per rotor, Nm
       wing_group.rotor_thrust[iseg]   = thrust
 
-#      print(rotor_group.Q_overload,engine_power/1000)
+#====================================================================
+# calculate areas for vertical-axis and horizontal-axis rotors
+#====================================================================
+
+   rotor.Atilt             = 0.0
+   rotor.Acruise           = 0.0
+   rotor.Alift             = 0.0
+   if update:
+      for i in range(rotor.ngroups):
+         group             = rotor.groups[i]
+         if(group.type == 'tilting'):
+            rotor.Atilt    = rotor.Atilt + group.area*group.nrotors
+         elif(group.type == 'lift'):
+            rotor.Alift    = rotor.Alift + group.area*group.nrotors 
+         elif(group.type == 'cruise'):
+            rotor.Acruise  = rotor.Acruise + group.area*group.nrotors 
+
+#====================================================================
+# total rotor areas available for propulsive thrust
+# If there are no horizontal-axis propellers, tilt the body
+#====================================================================
+      
+      Athrust             = rotor.Atilt + rotor.Acruise     # cruise 
+      Alift               = rotor.Atilt + rotor.Alift       # total disk area available to hover
+
+      if(Alift == 0):
+         print('THERE ARE NO VERTICAL-AXIS ROTORS FOR LIFT-OFF')
+         quit('STOP TRYING TO DESIGN FIXED-WING AIRCRAFT')
+
+#====================================================================
+# Loop over rotor groups and calculate area ratios
+#====================================================================
+
+      for i in range(rotor.ngroups):
+         group             = rotor.groups[i]
+         Agroup            = group.nrotors*group.area
+
+#====================================================================
+# in cruise condition, we have two requirements; Fx and Fz
+#====================================================================
+# Cruise propeller:
+#     easiest to handle. Can only produce horizontal thrust to 
+#     overcome drag; doesn't do anything else
+#
+# Lift rotor:
+#     produce thrust along body vertical axis. In absence of all 
+#     other types of rotors, can be used to produce both vertical 
+#     lift and forward thrust
+#     
+# Tilt rotors:
+#     in the presence of lift rotors, produce forward thrust 
+#     only; when no other rotors are present, set tilt to get 
+#     vertical force also
+#
+# Set vertical and horizontal force requirements based on area ratios
+#====================================================================
+
+         if(group.type == 'cruise'):
+            group.Arat_lift   = 0.0                   # no vertical force from this group
+            group.Arat_thrust = Agroup/Athrust        # no thrust from this group
+
+         elif(group.type == 'lift'):
+            group.Arat_lift   = Agroup/Alift          # area ratio of rotor group in hover
+            group.Arat_thrust = 0.0                   # no thrust from this group
+
+#====================================================================
+# if there are no cruise propellers or tilting rotors, 
+# then lift rotors have to overcome drag in cruise too by tilting
+# the entire body
+#====================================================================
+
+            if(Athrust == 0):
+               group.Arat_lift      = Agroup/Alift
+               group.Arat_thrust    = Agroup/Alift
+
+#====================================================================
+# For tilting rotors: two main cases to consider
+# if used with both lift rotors and cruise propellers, 
+# use tilting rotors for both vertical and horizontal thrust
+#====================================================================
+
+         elif(group.type == 'tilting'):
+            group.Arat_lift   = Agroup/Alift          # area ratio of rotor group in hover
+            group.Arat_thrust = Agroup/Athrust        # area ratio of rotor group in cruise
+
 #====================================================================
 #adding tail rotor power for single MR type aircraft: 10% additional 
 #====================================================================

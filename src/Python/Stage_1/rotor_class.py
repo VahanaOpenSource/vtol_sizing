@@ -183,6 +183,7 @@ class rotor_group:
 #geometric parameters
 #=======================================================================
 
+      self.nrotors        = 0
       self.motor_group_id = -1    # which motor group is sized by this rotor
       self.wing_group_ids = []
       self.nblade         = 0
