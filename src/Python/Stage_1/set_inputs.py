@@ -22,10 +22,14 @@ class _set_inputs:
 
         ad                = self.all_dict 
         ops               = obj(ad['operations'])
+        npax              = ad['aircraft']['pax_count']
         init_cost         = ad['purchase']
-        beta_factors      = init_cost['Beta_acq_factors']
-        self.costs        = costs(ops, init_cost, beta_factors, self.mission.cost_duration, \
-        					self.rotor.nrotors)
+        if(bool(init_cost)):
+            beta_factors      = init_cost['Beta_acq_factors']
+            self.costs        = costs(ops, init_cost, beta_factors, self.mission, \
+            					self.rotor.nrotors, npax)
+        else:
+            self.costs        = {}
         self.wt_redund    = ad['redund']
 
         return None

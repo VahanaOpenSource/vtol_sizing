@@ -264,16 +264,18 @@ class rotor_group:
      elif self.span_driven:
         wgids           = self.wing_group_ids
         size            = 1.0 + clearance*0.5     # clearance for rotor on each side
-        radius          = 1.0e9
+        Rmin            = 1.0e9
         for wgid in wgids:
             group       = wing_groups[wgid]
             nr          = group.nrotors/group.nwings
-            multiplier  = size*float(nr) - 1.0
-            Rmax        = (group.span - bfus)*0.5/multiplier
-            radius      = min(radius, Rmax)
 
-        # print('rotor radius from span driven sizing is ',radius)
-        self.radius     = radius 
+            multiplier  = size*float(nr) - 1.0
+            radius      = (group.span - bfus)*0.5/multiplier
+            Rmin        = min(radius, Rmin)
+            #print('group',wgid,'SPAN = ',group.span,multiplier,radius,Rmin)
+        #print('rotor radius from span driven sizing is ',Rmin)
+        #x1=input('?')
+        self.radius     = Rmin 
 
 #====================================================================
 # error message
@@ -392,9 +394,9 @@ class rotor_group:
       for key,group in wing_groups.items():
          nr             = group.nrotors
          nr_all         = nr_all+nr           # rotors per wing 
-#         nrmax          = max(nrmax,nr)       # identify min rotors in a set 
+         nrmax          = max(nrmax,nr)       # identify min rotors in a set 
 #      print(nr_all,nrmax)
-      nrmax             = nr_all
+#      nrmax             = nr_all
       self.T_overload   = float(nrmax/(nrmax-2))+0.2    # emergency to nominal thrust ratio
 
 #===============================================================================
@@ -435,7 +437,7 @@ class rotor_group:
 
 # Constants
 
-   def fanNoise(self,S,theta):
+   def fanNoise(self,S,theta, Thrust, power_Watts):
 
         NtoLb = 0.224809           # Newtons to lb
         WtoHp = 0.00134102         # Watts to hp
@@ -455,7 +457,7 @@ class rotor_group:
 # Thrust in pounds
 #===============================================================================
 
-        T_lb    = self.thrust[0] * NtoLb
+        T_lb    = Thrust * NtoLb
 
 #===============================================================================
 # Parameters
@@ -465,7 +467,7 @@ class rotor_group:
         S_ft    = S *m2f                        # Distance to source in ft
         R_ft    = self.radius * m2f             # Radius in ft
         A_ft2   = self.area* m2f*m2f            # Disc area in ft^2
-        P_Hp    = self.power * WtoHp            # Power in Hp
+        P_Hp    = power_Watts * WtoHp           # Power in Hp
         M_t     = VTip /self.ainf               # tip mach number
         A_b     = A_ft2 * self.solidity         # blade area, sq. ft
 
@@ -554,15 +556,13 @@ class rotor_group:
                  'sigma': self.solidity}
 
 #      print('hello motor',self.tipspeed,self.radius,self.RPM_overload);quit()
-
 #      print(self.sizing_torque,self.nblade,self.Q_overload)
 #      print(self.tipspeed,self.radius,self.RPM_overload)
 #      quit()
 #      print(Rotor);quit()
-      rotor_mass  = blade_wt_modelv2(Rotor, tech_factor)
-
-      return rotor_mass           # in kg 
-
+      rotor_mass, total  = blade_wt_modelv2(Rotor, tech_factor)
+      self.mass_assembly = total/nr           # mass of single rotor+hub+actuator assembly, kg
+      return rotor_mass           
 
 #==================================================================
 # ANTI-ICING WEIGHT FOR BLADES

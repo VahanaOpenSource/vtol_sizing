@@ -9,9 +9,14 @@ Sizing:
       All_wings:
          aspectratio:      [4,5,6,7,8,9,10] 
          cl:               [0.3,0.4,0.5,0.6,0.7]
-         liftfraction:     [1] 
-         nwing:            [2]
-         nrotors:          [4]
+         liftfraction:     [0.5,0.6,0.7,0.75,0.8,0.9,0.95] 
+         nwing:            [1]
+         nrotors:          [6]
+      Aft_wings:
+         aspectratio:      [4,5,6,7,8,9,10] 
+         cl:               [0.3,0.4,0.5,0.6,0.7]
+         nwing:            [1]
+         nrotors:          [2]
 
 # fidelity options for weight and performance models
    ifea:               False     # set to 1 for beam lattice model: to be set up!
@@ -23,13 +28,14 @@ Configuration:
       All_rotors:    'All_motors' # what motor group to use to drive a given rotor group
    Wings:
       All_wings:     'All_rotors' # tell the configuration what rotor group to use on a given wing group
+      Aft_wings:     'All_rotors' # tell the configuration what rotor group to use on a given wing group
 
 # note: 4k95 = 1219.2 m, ISA + 27.92 C, 6k95 = 1828.8 m, ISA + 11.88 C
 # flight mode: 0-idle, 1-hover, 3-cruise
 Mission:
    nsegments:          4
    flight_mode:        ['hover','cruise', 'cruise','hover'   ]
-   time_seg:           [    1.5,    17.2,        5,    1.5   ]
+   time_seg:           [    1.5,       0,        0,    1.5   ]
    start_altitude:     [    0.0,    00.0,        0,      0   ] # m
    end_altitude:       [    0.0,     0.0,        0,      0   ] # m
    delta_temp_isa:     [    0.0,     0.0,        0,      0   ] # centrigrade
@@ -48,7 +54,7 @@ Aircraft:
    mass_payload:      0.0
    mass_crew:         0 
    avionics:         79.2
-   common_equipment: 00.0        # HVAC systems - common for all PAX
+   common_equipment: 15.0        # HVAC systems - common for all PAX
    common_per_pax:   13.0
    pax_count:         2          # number of passengers (uses pax -> baggage map)
 

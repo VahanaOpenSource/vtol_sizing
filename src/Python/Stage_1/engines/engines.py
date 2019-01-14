@@ -153,8 +153,9 @@ class _engines:
             p_ins           = max(p_ins,rotor.groups[irg].powerTOP)     # still from one rotor
 
          group.p_ins[iseg]  = p_ins 
+         # print('group installed power',p_ins)
          total_pins         = total_pins + p_ins*nmotor
-      self.p_ins            = max(self.p_ins,total_pins)
+      self.p_ins            = total_pins
 
 #      print('installed power is ',self.p_ins)
          # print(p_ins);x=input('?')
@@ -246,14 +247,19 @@ class _engines:
 
          inputs      = {'powerReq': P_req   , 'tech_fac': fac}
          motor_mass  = self.engine.getWeight(inputs)
-         # print('rated power is ',P_req,'motor mass is ',motor_mass)
+         self.motor.groups[i].motor_mass     = motor_mass
+
          motor_mass  = motor_mass*nmotor
          key         = 'motor_group' + str(i) 
-         k2          = key + '_mount'
-         mwts[key]   = motor_mass 
-         mwts[k2]    = 0.15*motor_mass       # fraction based on Alpha
+         mwts[key]   = motor_mass
 
-         total       = total+motor_mass+mwts[k2]
+#         mount_mass  = 0.1*motor_mass                       # 10% motor mount mass
+#         self.motor.groups[i].mount_mass     = mount_mass
+#         mount_mass  = mount_mass*nmotor
+#         k2          = 'mount_group' + str(i) 
+#         mwts[k2]    = mount_mass       # fraction based on Alpha
+
+         total       = total+motor_mass#+mount_mass
 
       mwts['total']  = total
 

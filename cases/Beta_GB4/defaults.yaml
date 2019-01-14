@@ -153,5 +153,5 @@ Operations:
 Redundancies:
    wing_flap:              1.0 
    tilt_actuator:          2.0
-   wires:                  1.0
+   wires:                  2.0
    avionics:               1.0

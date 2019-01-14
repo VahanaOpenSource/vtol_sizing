@@ -1,0 +1,70 @@
+Sizing:
+
+   Rotors:
+      All_rotors:
+         Nb:         [3]                      # per rotor
+         Vtip:       [170]                    # hover tip speed, m/s
+         ctsigma:    [0.139]
+   Wings:
+      Main_wing:
+         nwing:            [1]
+         aspectratio:      [5,6,7,8] 
+         cl:               [0.4,0.5,0.6]
+         liftfraction:     [0.9]
+         nrotors:          [6]
+      Tail:
+         nwing:            [1]
+         aspectratio:      [6]
+         cl:               [0.3]
+         nrotors:          [2]
+   Fuselage:
+      nrotors:      0
+
+# fidelity options for weight and performance models
+   ifea:               False     # set to 1 for beam lattice model: to be set up!
+   use_bemt:           False
+
+#aircraft configuration: map rotors to wings
+Configuration:
+   Rotors:
+      All_rotors:    'All_motors' # what motor group to use to drive a given rotor group
+   Wings:
+      Main_wing:     'All_rotors' # tell the configuration what rotor group to use on a given wing group
+      Tail:          'All_rotors' # tell the configuration what rotor group to use on a given wing group
+
+# note: 4k95 = 1219.2 m, ISA + 27.92 C, 6k95 = 1828.8 m, ISA + 11.88 C
+# flight mode: 0-idle, 1-hover, 3-cruise
+Mission:
+   nsegments:          4
+   flight_mode:        ['hover','cruise', 'cruise','hover'   ]
+   time_seg:           [    1.5,       0,        0,    1.5   ]
+   start_altitude:     [    0.0,    00.0,        0,      0   ] # m
+   end_altitude:       [    0.0,     0.0,        0,      0   ] # m
+   delta_temp_isa:     [    0.0,     0.0,        0,      0   ] # centrigrade
+   rate_of_climb:      [      0,       0,        0,      0   ] # m/min
+   cruise_speed:       [      0,      98,       98,      0   ] # knots
+   distance:           [      0,      50,       15,      0   ] # in km
+   add_payload:        [      0,       0,        0,      0   ] # jettison/pick up additional payload at end of segment
+   segment_type:       [  'all',   'all','reserve',   'all'  ] # all = use for sizing and cost; reserve = sizing only
+   sizing_order:       [      1,       2,        0,      0   ] # order of operations: 0 => no sizing
+   # fixed_GTOW:         1400.0
+Aircraft:
+   aircraftID: 2
+   # 1: SMR, 3: Coax, 4: Quadrotor (needs to be improved), 5: custom
+
+   # payload, crew (kg)
+   mass_payload:     320.0       # 250 kg payload + 70 kg margin
+   mass_crew:         0 
+   avionics:         79.2
+   common_equipment: 24.0        # HVAC systems - common for all PAX
+   common_per_pax:   00.0
+   pax_count:         0          # number of passengers (uses pax -> baggage map)
+
+   # rotor parameters ("lift" or "tilt")
+   nrotor:            8
+
+   # Cruise propeller count
+   npropeller:        0
+
+   # engine parameters
+   engineType:       'electric_motor'

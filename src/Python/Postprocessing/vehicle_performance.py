@@ -9,23 +9,16 @@
 
 import yaml, sys, os, matplotlib, numpy
 import matplotlib.pyplot as plt
-
+from numpy import pi
 #====================================================================
 # unit conversions
 #====================================================================
 
-# kts2fps = 1.68781
-# fps2kts = 1.0/kts2fps
-# fps2nm  = 0.000164579
-# rho     = 0.002378         # slugs/ft3
-# grav    = 32.18            # ft/s/s
-
-#si units
 grav    = 9.81             # m/s/s
-# rho     = 1.2256           # kg/cu.m
 kts2mps = 0.5147           
 r2d     = 180.0/numpy.pi 
 d2r     = numpy.pi/180.0
+
 #==========================
 # use these lines for latex
 #==========================
@@ -50,94 +43,60 @@ class vehicle_performance:
 # initialization: load data
 #====================================================================
    
-   def __init__(self, filename, design, table_data):
-
-      if not os.path.isfile(filename):
-         print('\n\nFile:',filename,'does not exist.\n\n')
-         sys.exit(1)
-
-      self.design       = design
-      with open(filename) as f:
-         fyaml=yaml.load(f)
-
-#====================================================================
-# basic dictionary pointers and parameters
-#====================================================================
-
-      self.rotor        = fyaml['Rotor']['set0']
-      self.rotor['A']   = numpy.pi*self.rotor['radius']**2
-      self.vehicle      = fyaml['vehicle']
-      self.mission      = fyaml['Mission']
-      self.rho          = self.mission['density'][0]
-      self.f_factor     = fyaml['Parasitic_drag']['flat_plate_area']*1.05
-      self.weights      = fyaml['Weights']
-      self.battery      = fyaml['Battery']
-
-#====================================================================
-# Power in hover and cruise
-#====================================================================
-
-      self.P_h       = self.mission['battery_power_draw'][0]
-      self.P_c       = self.mission['battery_power_draw'][1]
-      self.gtow      = self.vehicle['take_off_mass']*grav
-      self.Vcruise   = max(self.mission['cruise_speed'])*kts2mps     # in m/s
-      self.Vthresh   = 0.7*self.Vcruise
-      self.Vthresh2  = self.Vcruise - 10
-      self.FM        = self.rotor['hover_FM']
-      self.eta_xmsn  = self.rotor['eta_xmsn']
-
-#====================================================================
-# available power at rotor is stored in a parameter called "pwr_installed" (units are hp)
-#====================================================================
-
-      self.pwr_installed   = self.vehicle['power_installed']
-      self.total_energy    = self.mission['total_energy']           
-      self.prop_present    = False
-
-#====================================================================
-# interpret wings (dissimilar groups)
-#====================================================================
-
-      wings                = fyaml['Wings']
-      wing_groups          = {}
-      i                    = -1
-      Atotal               = 0.0
-      for group,data in wings.items():
-         Atotal            = Atotal + data['span']*data['chord']*data['nwing']
-         data['area']      = data['span']*data['chord']
-
-         ARe               = data['aspect_ratio'] * data['oswald']
-         data['ARe']       = ARe
-         data['Cla']       = ARe/(ARe+2.0)*2*numpy.pi       # lift-curve slope, /rad
-         data['alpha']     = data['cl']/data['Cla']         # cruise AoA, in rad
-         data['alpha_max'] = 0.85/data['Cla']*r2d           # max angle of attack, deg
-         print('trim AoA is ',data['alpha']*r2d)
-         i                 = i+1
-         wing_groups[i]    = data
-      
-      self.wings           = wing_groups
-      self.total_Awing     = Atotal 
-      self.BIGVALUE        = 1e15
-
-      if(Atotal > 1.e-3):
-         self.wing_present = True 
-      else:
-         self.wing_present = False
+   def __init__(self, design, table_data):
 
 #====================================================================
 # determine tilt type if relevant
 #====================================================================
+      
+      adict                = design.all_dict['aircraft']
+      aID                  = adict['aircraftID']
 
-      if self.vehicle['aircraftID'] == 2:            # tilt something
-         if self.rotor['hvr_dwld'] < 0.1:
+      self.wing_present    = bool(design.wing)
+      if aID == 2:            # tilt something
+         if design.rotor.groups[0].hvr_dwld < 0.1:
             self.tilt_type = 'tilt_wing'
          else: 
             self.tilt_type = 'tilt_rotor'
-      elif self.aircraftID == 5:          # tail-sitter
+      elif aID == 5:          # tail-sitter
          self.tilt_type    = 'tilt_body'
       else:                               # regular or compound
-         self.tilt_type = 'none'
+         self.tilt_type    = 'none'
  
+      self.design          = design
+      self.rho             = design.mission.segment[0].rho 
+
+      self.Vcruise         = 0.0
+      mission              = design.mission
+      self.tcruise         = 0.0
+      self.thover          = 0.0
+      for i in range(mission.nseg):
+         segment           = mission.segment[i]
+         self.Vcruise      = max(self.Vcruise,segment.cruisespeed*kts2mps)
+         if(segment.flightmode == 'cruise'):
+            self.tcruise   = self.tcruise + segment.time          # cruise time in min
+         elif(segment.flightmode == 'hover'):
+            self.thover    = self.thover  + segment.time
+      self.Vthresh         = 0.7*self.Vcruise
+      self.Vthresh2        = self.Vcruise - 10
+
+#====================================================================
+# vehicle global parameters
+#====================================================================
+
+      self.gtow            = design.massTakeoff*grav 
+      self.f_factor        = design.f_plate
+
+#====================================================================
+# Installed power line
+#====================================================================
+
+      if design.etype == 'electric_motor':
+         Eins                 = design.engine.Eins
+         self.pwr_installed   = 6*Eins                  # 6C is max "installed" power for battery
+      else:
+         self.pwr_installed   = design.p_ins
+
 #====================================================================
 # read airfoil tables from input file (0012 right now)
 #====================================================================
@@ -181,11 +140,13 @@ class vehicle_performance:
 
          plt.show()
 
-      self.clmax = 1.0        
+      self.clmax  = 1.0        
 
-      self.vstall = numpy.sqrt(2.0*self.gtow/(self.clmax*self.rho*self.total_Awing))
+      design      = self.design
 
-      print('static stall speed is ', self.vstall,' m/s')
+      if(bool(design.wing)):
+         self.vstall = design.wing.groups[0].stall_speed
+         print('static stall speed is ', self.vstall,' m/s')
 
 #====================================================================
 # find wing loads
@@ -198,15 +159,15 @@ class vehicle_performance:
       q              = 0.5*rho*vinf*vinf 
 
 #wing properties
-      qS             = q * group['area']
-      nwing          = group['nwing']
+      qS             = q * group.area
+      nwing          = group.nwings
 
 # get cl and cd from tables, implement 3d correction
       cl_wing        = numpy.interp(alpha_w, self.aoadata, self.cldata)
       cd0_wing       = numpy.interp(alpha_w, self.aoadata, self.cddata)
 
 #implement 3d correction for wing 
-      ARe            = group['ARe']
+      ARe            = group.aspectratio*group.oswald
       K              = 1.0/(numpy.pi*ARe)
       cl_wing        = cl_wing  * ARe/(2.0+ARe)         
       cd_wing        = cd0_wing + cl_wing*cl_wing *K
@@ -228,7 +189,7 @@ class vehicle_performance:
 # alpha_w = wing angle of attack
 #====================================================================
 
-   def trim_solve(self, vinf, weight, rho, alpha_guess): 
+   def trim_solve(self, vinf, weight, rho, alpha_guess, dalpha_max=1e5): 
 
       converged      = False
       maxcount       = 5000
@@ -240,10 +201,12 @@ class vehicle_performance:
 # incoming weight does not take into account hover download factor
 # add extra thrust up to mu = 0.1, linearly vary down from mu=0.05 
 #====================================================================
-      
-      Vtip              = self.rotor['tip_speed']
+
+      design            = self.design 
+      rotor             = design.rotor.groups[0]
+      Vtip              = rotor.tipspeed        # m/s, hover tip speed
       mu                = vinf/Vtip
-      dwld              = self.rotor['hvr_dwld']
+      dwld              = rotor.hvr_dwld
       if mu < 0.05:
          over_T         = dwld
       elif mu < 0.1:
@@ -254,7 +217,8 @@ class vehicle_performance:
       Fzreq             = weight*(1.0+over_T)
       Fxreq             = q * self.f_factor 
 
-      if self.prop_present:
+      adict             = self.design.all_dict['aircraft']
+      if adict['npropeller'] > 0:
          soln_type         = 'analytical'     # propeller: keep vehicle flat
       else:                                # 
          if self.wing_present:
@@ -272,20 +236,22 @@ class vehicle_performance:
 #====================================================================
 
       Lw             = 0.0; Dw = 0.0
+      wing           = self.design.wing
       if self.wing_present:
          if vinf > 0:
-            for key,data in self.wings.items():
-               CLreq       = Fzreq*data['lift_fraction']/(q*data['area']*data['nwing'])
-            alpha_w        = CLreq/(data['Cla'])*r2d
-            if alpha_w > data['alpha_max']:
-               alpha_w     = data['alpha_max'] 
-            CLw            = data['Cla'] * alpha_w * d2r
-            ARe            = data['ARe']
-            K              = 1.0/(numpy.pi*ARe)
-
-            CDw            = (data['cd0'] + K*CLw*CLw)*1.05
-            Lw             = Lw + q*data['area']*CLw*data['nwing'] 
-            Dw             = Dw + q*data['area']*CDw*data['nwing']
+            for igroup in range(wing.ngroups):
+               group       =wing.groups[igroup]
+               CLreq       = Fzreq*group.lift_frac/(q*group.area*group.nwings)
+               ARe         = group.aspectratio*group.oswald
+               CLa         = 0.11*ARe/(ARe+2.0)
+               alpha_w     = CLreq/CLa                # AoA, deg 
+               if alpha_w > 12.0:                     # stall AoA, deg
+                  alpha_w  = 12.0 
+               CLw         = CLa * alpha_w 
+               K           = 1.0/(pi*ARe)
+               CDw         = (group.cd0 + K*CLw*CLw)*1.05
+               Lw          = Lw + q*group.area*CLw*group.nwings
+            Dw             = Dw + q*group.area*CDw*group.nwings
 
          else:
             alpha_w        = 0.0
@@ -426,8 +392,11 @@ class vehicle_performance:
             alpha       = alpha_guess
             while not soln_found:
                Lw       = 0.0; Dw = 0.0
-               for gname,group in self.wings.items():
-                  alpha_w0 = 90.0 - alpha + group['alpha']*r2d      
+               for gname,group in self.design.wing.groups.items():
+                  ARe      = group.aspectratio*group.oswald
+                  CLa      = 0.11*ARe/(2.0+ARe)    # lift curve slope / deg
+                  alpha_m  = group.cl/CLa                                       # wing mount angle, deg
+                  alpha_w0 = 90.0 - alpha + alpha_m
 #loop over flap settings at this wing tilt angle
                   Lwg, Dwg = self.wing_loads(alpha_w, vinf, rho, group)
                   Lw       = Lwg + Lw
@@ -439,10 +408,17 @@ class vehicle_performance:
                FzR      = Fzreq - Lw
                # x1  = input('yes?')
 # update rotor TPP orientation angle
-               al_new   = numpy.arctan2(FxR, FzR)*r2d
+               al_new      = numpy.arctan2(FxR, FzR)*r2d
+               alpha_prev  = alpha
                alpha    = 0.95*al_new + 0.05*alpha 
 
-               if abs(al_new - alpha) < 1e-4:
+               if abs(alpha - alpha_guess) > dalpha_max:
+                  print(alpha_guess,dalpha_max,alpha)
+                  max_allow = alpha_guess + numpy.sign(alpha-alpha_guess)*dalpha_max
+                  al_print  = alpha
+                  alpha     = max_allow
+                  # print(alpha_guess,'capping AoA variation: wanted',al_print,' allowed: ',max_allow)
+               if abs(alpha_prev - alpha) < 1e-4:
                   soln_found = True 
 
             T           = numpy.sqrt(FxR*FxR + FzR*FzR)
@@ -452,10 +428,11 @@ class vehicle_performance:
 # print vinf,P, alpha
 # x = raw_inumpyut('ok?')
 
-      alpha = alpha*d2r
+      alpha    = alpha*d2r
+      LbyD     = weight*vinf/P*0.001
 
-      P     = P/self.eta_xmsn          # get power draw at source
-      return P, alpha, soln_found
+      P        = P/self.eta_xmsn(vinf,0)          # get power draw at source
+      return P, alpha, soln_found, LbyD
 
 #====================================================================
 # inflow convergence using fixed-point iterations
@@ -486,60 +463,85 @@ class vehicle_performance:
 # low speed: full rotor RPM
 #====================================================================
 
-      A           = self.rotor['A']       # disk area, sq.m
+      rotor       = self.design.rotor
+
       V1          = self.Vthresh
       V2          = self.Vthresh2
-      nrotor      = self.rotor['nrotor']
-      rpm_ratio   = self.rotor['cruise_rpm_ratio']
+
+      for i in range(rotor.ngroups):
+         group       = rotor.groups[0]
+         A           = group.area
+         nrotor      = group.nrotors
+         rpm_ratio   = group.RPM_ratio
 
 #      if vinf < V1:
 #         factor   = 1.0 
 #      elif vinf <= V2:
 #         factor   = 1.0 - (1.0-rpm_ratio)*(vinf-V1)/(V2-V1)
 #      else:
-      factor      = rpm_ratio 
+         factor      = rpm_ratio 
 #      print 'airspeed is ',vinf/kts2fps 
 #      yemp = raw_inumpyut('yo?') 
 #      print 'rotor rpm ratio is ',factor 
-      converged   = False 
-      sigma       = self.rotor['solidity']
-      while (not converged):
-         vtip           = self.rotor['tip_speed']*factor   # Vtip at this vinf
-         Tnd            = rho*A*vtip*vtip                  # normalized thrust
-         CT             = total_thrust/(nrotor*Tnd)        # thrust coeff.
-         CTsig          = CT/sigma 
-         if(CTsig > 0.14):
-            factor      = numpy.sqrt(CTsig/0.14)*factor*1.01 
-         else:
-            converged   = True
-      Pnd         = rho*A*vtip*vtip*vtip/1000.0      # to convert Cp to hp
-      mu          = vinf*numpy.cos(alpha)/vtip       # advance ratio
+         converged   = False 
+         sigma       = group.solidity
+         while (not converged):
+            vtip           = group.tipspeed*factor   # Vtip at this vinf
+            Tnd            = rho*A*vtip*vtip                  # normalized thrust
+            CT             = total_thrust/(nrotor*Tnd)        # thrust coeff.
+            CTsig          = CT/sigma 
+            if(CTsig > 0.14):
+               factor      = numpy.sqrt(CTsig/0.14)*factor*1.01 
+            else:
+               converged   = True
+         Pnd         = rho*A*vtip*vtip*vtip/1000.0      # to convert Cp to kW
+         mu          = vinf*numpy.cos(alpha)/vtip       # advance ratio
 
 #converge inflow (total inflow)
-      mutanal     = vinf*numpy.sin(alpha)/vtip 
-      lam         = self.converge_inflow(mu, mutanal, CT) 
-      ald         = alpha*r2d
-      cd0         = self.rotor['cd0']#*(90.0-ald)/80.0
-      ripf        = self.rotor['ipf']
-      cipf        = 1.0/self.rotor['prop_eta']
-      if ald < 10.0:
-         ipf      = ripf
-      elif ald > 85:
-         ipf      = cipf       # no induced losses
-      else:                   # between 10 and 100
-         ipf      = ripf + (cipf-ripf)*(85.0-ald)/75.0
+         mutanal     = vinf*numpy.sin(alpha)/vtip 
+         lam         = self.converge_inflow(mu, mutanal, CT) 
+         ald         = alpha*r2d
+         cd0         = group.cd0#*(90.0-ald)/80.0
+         ripf        = group.ipf
+         cipf        = 1.0/self.design.prop.eta
+         if ald < 10.0:
+            ipf      = ripf
+         elif ald > 85:
+            ipf      = cipf       # no induced losses
+         else:                   # between 10 and 100
+            ipf      = ripf + (cipf-ripf)*(85.0-ald)/75.0
 #calculate rotor induced and profile power 
-      cpi         = ipf*CT*lam*nrotor
-      Pi          = cpi*Pnd
-      cp0         = 0.125*sigma*cd0*(1.0+4.65*mu*mu)
-      Po          = nrotor*cp0*Pnd 
-      Ptotal      = Pi + Po
+         cpi         = ipf*CT*lam*nrotor
+         Pi          = cpi*Pnd
+         cp0         = 0.125*sigma*cd0*(1.0+4.65*mu*mu)
+         Po          = nrotor*cp0*Pnd 
+         Ptotal      = Pi + Po
       # print total_thrust/2/A
       # print 'FM = ',(CT*sqrt(0.5*CT))/(lam*CT + cp0)
       # print ('%8.3f %8.3f %8.5f %8.5f %8.2f' % (vinf/kts2fps, rho, CT*sqrt(0.5*CT)*ipf*Pnd*self.nrotor, Pi, Po))
       # print(alpha*r2d,total_thrust, vinf, Ptotal)
+      
       return Ptotal
 
+# ===================================================================
+# transmission efficiency calculation
+# ===================================================================
+   
+   def eta_xmsn(self, vinf, imotor):
+
+      V1       = self.Vthresh
+      V2       = self.Vthresh2
+
+      eta_h    = self.design.motor.groups[imotor].hover_efficiency
+      eta_c    = self.design.motor.groups[imotor].cruise_efficiency
+      if vinf < V1:
+         eta   = eta_h 
+      elif vinf <= V2:
+         eta   = eta_h + (eta_c-eta_h)/(V2-V1)*(vinf-V1)
+      else:
+         eta   = eta_c 
+
+      return eta 
 # ===================================================================
 # power curve
 # ===================================================================
@@ -575,7 +577,7 @@ class vehicle_performance:
 #====================================================================
 
       for iw in range(nflt):
-         rho            = self.mission['density'][1]
+         rho            = self.rho
          weight         = weights[iw]*grav
          vmin           = 0.0 
          xaxis[:,iw]    = numpy.linspace(vmin, vmax, nvinf)
@@ -591,7 +593,9 @@ class vehicle_performance:
                alpha_guess    = 0.0 
             else:
                alpha_guess    = alpha_s[j-1,iw]
-            P,als,valid       = self.trim_solve(vinf, weight, self.rho, alpha_guess)
+
+            dalpha            = 7.5#*numpy.pi/180.0
+            P,als,valid,LtoD  = self.trim_solve(vinf, weight, self.rho, alpha_guess)
 
 #====================================================================
 # If trim didnt converge, use previous point
@@ -602,14 +606,14 @@ class vehicle_performance:
                als            = alpha_s[j-1,iw]
                xaxis[j,iw]    = xaxis[j-1,iw]
             Power[j,iw]       = P
-            LbyD[j,iw]        = weight*vinf/(P*1000)
+            LbyD[j,iw]        = LtoD
             alpha_s[j,iw]     = als*r2d 
 
 #====================================================================
 # find cruise point, mark it with red circle
 #====================================================================
 
-         Pc,alc,valid         = self.trim_solve(self.Vcruise, weight, rho, alpha_guess)
+         Pc,alc,valid,LtoD    = self.trim_solve(self.Vcruise, weight, rho, alpha_guess)
 
 #====================================================================
 # update plots
@@ -636,21 +640,26 @@ class vehicle_performance:
             plt.plot(self.Vcruise,als*r2d,'ro',markersize=12,markerfacecolor='None',markeredgewidth=2.2)
 
          plt.figure(4)
-         plt.plot(xaxis[:,iw], LbyD[:,iw]/self.eta_xmsn,linestyle=style,linewidth=2.4,label=label,color=color,alpha=alpha)
+         plt.plot(xaxis[:,iw], LbyD[:,iw],linestyle=style,linewidth=2.4,label=label,color=color,alpha=alpha)
          if iw == 0:
-            plt.plot(self.Vcruise,weight*self.Vcruise/(self.eta_xmsn*Pc*1000),'ro',markerfacecolor='None',markersize=12,markeredgewidth=2.2)
+            plt.plot(self.Vcruise,LtoD,'ro',markerfacecolor='None',markersize=12,markeredgewidth=2.2)
 
 #====================================================================
 # total power
 #====================================================================
 
       plt.figure(2)
-      plt.plot([vmin,vmax],[self.pwr_installed,self.pwr_installed],'k--',linewidth=3.0,label='installed')
-      plt.xlabel('Cruise speed (m/s)')
-      plt.ylabel('Battery power required (kW)')
+      if(self.design.etype == 'electric_motor'):
+         lab   = '6 C'
+      else:
+         lab   = 'installed'
+
+      plt.plot([vmin,vmax],[self.pwr_installed,self.pwr_installed],'k--',linewidth=3.0,label=lab)
+      plt.xlabel('\\textbf{Cruise speed (m/s)}')
+      plt.ylabel('\\textbf{Battery power required (kW)}')
       plt.grid(linestyle=':')
-      xmax     = round(vmax*1.1,-1)
-      # plt.xlim([0.0,xmax])
+      xmax     = round(vmax,-1)
+      plt.xlim([0.0,xmax])
 
       plt.ylim([0.0,1.2*self.pwr_installed])
       plt.legend(loc='best')
@@ -660,8 +669,8 @@ class vehicle_performance:
       plt.close()
 
       plt.figure(3)
-      plt.xlabel('Cruise speed (m/s)')
-      plt.ylabel('Wing tilt (deg)')
+      plt.xlabel('\\textbf{Cruise speed (m/s)}')
+      plt.ylabel('\\textbf{Wing tilt (deg)}')
       plt.grid(linestyle=':')
       # plt.xlim([0.0,xmax])
       plt.ylim([0.0,100])
@@ -679,14 +688,14 @@ class vehicle_performance:
 #         idx            = indices[iw]
 #         rho            = self.all_rho[idx]       # density in slug/cu.ft
 #         weight         = weights[idx]
-      plt.xlabel('Cruise speed (m/s)')
-      plt.ylabel('Lift to Drag ratio WV/P$_{rotor}$')
+      plt.xlabel('\\textbf{Cruise speed (m/s)}')
+      plt.ylabel('\\textbf{Lift to Drag ratio WV/P$_\\textrm{rotor}$}')
       plt.grid(linestyle=':')
       plt.legend(loc='best')
 
       # print xmax, 
       # plt.xlim([0.0,xmax])
-      plt.ylim([0.0,numpy.ceil(numpy.amax(LbyD/self.eta_xmsn))])
+      plt.ylim([0.0,numpy.ceil(numpy.amax(LbyD*1.1))])
       plt.tight_layout()
       # plt.savefig('LbyD.png',format='png',dpi=150)
       self.pdf.savefig()
@@ -697,9 +706,10 @@ class vehicle_performance:
 
    def get_wts(self):
 
-      mfuel          = self.weights['battery'][0]
-      mpay           = self.weights['payload'][0]
-      empty_wt       = self.weights['empty_weight']['total'][0]
+      design         = self.design
+      mfuel          = design.mass_battery
+      mpay           = design.mission.payload
+      empty_wt       = design.massempty
 
       return mfuel, mpay, empty_wt
 
@@ -709,9 +719,11 @@ class vehicle_performance:
 
    def get_energy(self):
 
-      Ebatt                   = self.battery['rated_capacity']      # kWhr
-      SOH                     = self.battery['state_of_health']
-      DOD                     = self.battery['depth_discharge']
+      design                  = self.design 
+      Pack                    = design.engine.Pack
+      Ebatt                   = design.engine.Eins        # kW-hr
+      SOH                     = Pack.SOH
+      DOD                     = Pack.DOD_min
 
       return Ebatt, SOH, DOD
 
@@ -733,9 +745,9 @@ class vehicle_performance:
       payload        = numpy.zeros_like(fuel)               # payload, kg
       thover         = numpy.zeros((N,2))                   # hover  time
 
-      tcruise        = self.mission['time'][1] + self.mission['time'][2]
-      Pc,alc,valid   = self.trim_solve(self.Vcruise, self.gtow, self.rho, 90.0)
-      Ph,alh,valid   = self.trim_solve(0.0         , self.gtow, self.rho,  0.0)
+      tcruise        = self.tcruise
+      Pc,alc,valid,l = self.trim_solve(self.Vcruise, self.gtow, self.rho, 90.0)
+      Ph,alh,valid,l = self.trim_solve(0.0         , self.gtow, self.rho,  0.0)
       Ecruise        = Pc*tcruise/60.0
       Eactual        = Ebatt*(SOH-DOD) - Ecruise 
       tref           = Eactual/Ph*60
@@ -768,8 +780,8 @@ class vehicle_performance:
 #====================================================================
          
          weight         = (empty_wt + payload[i] + fuel[i])*grav
-         Ph,alh,valid   = self.trim_solve(0.0,          weight, self.rho,  0.0)
-         Pc,alc,valid   = self.trim_solve(self.Vcruise, weight, self.rho, 90.0)
+         Ph,alh,valid,l = self.trim_solve(0.0,          weight, self.rho,  0.0)
+         Pc,alc,valid,l = self.trim_solve(self.Vcruise, weight, self.rho, 90.0)
          Ecruise        = Pc*tcruise/60.0
          phover         = Ph
 
@@ -789,15 +801,15 @@ class vehicle_performance:
 # ===================================================================
          
       plt.figure()
-      plt.plot(thover[:,0], payload,'--b',label='Ideal battery',linewidth=2.4,alpha=0.4)
+      plt.plot(thover[:,0], payload,'-r',label='Ideal battery',linewidth=2.4,alpha=0.4)
       plt.plot(thover[:,1], payload,'-o',label='Vahana assumptions',linewidth=2.4,markevery=4)
-      plt.plot(tref, mpay,'o',markersize=16,markerfacecolor='none',markeredgewidth=2.5,markeredgecolor='k')
-      plt.ylabel('Payload (kg)')
-      plt.xlabel('Time in hover, min')
+      plt.plot(tref, mpay,'o',markersize=16,markerfacecolor='none',markeredgewidth=2.5,markeredgecolor='r')
+      plt.ylabel('\\textbf{Payload (kg)}')
+      plt.xlabel('\\textbf{Time in hover (min)}')
       plt.xlim([0,numpy.max(thover[:,0]*1.1)])
       plt.ylim([0,round(numpy.max(payload)*1.1,-2)])
       plt.grid(linestyle=':')
-      plt.title('Payload-Endurance in hover, fixed cruise distance')
+      plt.title('\\textbf{Payload-Endurance in hover, fixed cruise distance}')
       plt.legend(loc='best')
       plt.tight_layout()
       # plt.savefig('hover_endurance.png',format='png',dpi=150)
@@ -831,10 +843,10 @@ class vehicle_performance:
       fuel           = numpy.linspace(0,mpay+mfuel,N)       # fuel: from zero to full supply
       payload        = numpy.zeros_like(fuel)               # payload, kg
 
-      Pc,alc,valid   = self.trim_solve(self.Vcruise, self.gtow, self.rho, 90.0)
-      Ph,alh,valid   = self.trim_solve(0.0         , self.gtow, self.rho,  0.0)
+      Pc,alc,valid,l = self.trim_solve(self.Vcruise, self.gtow, self.rho, 90.0)
+      Ph,alh,valid,l = self.trim_solve(0.0         , self.gtow, self.rho,  0.0)
 
-      thover         = self.mission['time'][0]*2      # in min
+      thover         = self.thover 
       Ehover         = Ph*thover/60.0
       Eactual        = Ebatt*(SOH-DOD) - Ehover
       tref           = Eactual/Pc*60.0
@@ -872,7 +884,7 @@ class vehicle_performance:
 #====================================================================
 
          weight         = (empty_wt + payload[i] + fuel[i])*grav
-         Ph,alh,valid   = self.trim_solve(0.0,          weight, self.rho,  0.0)
+         Ph,alh,valid,l = self.trim_solve(0.0,          weight, self.rho,  0.0)
          Ehover         = Ph*thover/60.0
          Eactual        = Ebatt*(SOH-DOD) - Ehover 
          Eideal         = Ebatt           - Ehover
@@ -880,8 +892,8 @@ class vehicle_performance:
          Eabatt         = Eactual*fuel[i]/mfuel         
 
          for j in range(nV):
-            V           = all_V[j]
-            Pc,alc,valid   = self.trim_solve(V, weight, self.rho, 90.0)
+            V                 = all_V[j]
+            Pc,alc,valid,l    = self.trim_solve(V, weight, self.rho, 90.0)
 
             if (Pc < self.pwr_installed and Eibatt > 0 and Eabatt >0):
                tcruise[i,0,j] = Eibatt/Pc * 60.0 # convert from hrs to mins
@@ -894,20 +906,21 @@ class vehicle_performance:
       plt.figure()
       for j in range(nV):
          V     = all_V[j]
-         plt.plot(tcruise[:,1,j], payload,'-o',label='Vahana: ' + str(int(round(V,0))) + 'm/s',linewidth=2.0)
+         plt.plot(tcruise[:,1,j], payload,'-o',label=str(int(round(V,0))) + ' m/s',linewidth=2.0)
 
       for j in range(nV):
          V     = all_V[j]
          if(V == self.Vcruise):
-            plt.plot(tcruise[:,0,j], payload,'--b',label='Ideal battery',linewidth=2.4,alpha=0.4)
+
+            plt.plot(tcruise[:,0,j], payload,'-r',label=str(int(round(self.Vcruise,0))) + ' m/s, ideal battery',linewidth=2.4,alpha=0.4)
    
-      plt.plot(tref, mpay,'o',markeredgecolor='k',markersize=16,markerfacecolor='none',markeredgewidth=2.5)
-      plt.ylabel('Payload (kg)')
-      plt.xlabel('Time in cruise, min')
+      plt.plot(tref, mpay,'o',markeredgecolor='r',markersize=16,markerfacecolor='none',markeredgewidth=2.5)
+      plt.ylabel('\\textbf{Payload (kg)}')
+      plt.xlabel('\\textbf{Time in cruise (min)}')
       plt.xlim([0,numpy.max(tcruise[:,0,1]*1.1)])
       plt.ylim([0,round(numpy.max(payload)*1.1,-2)])
       plt.grid(linestyle=':')
-      plt.title('Payload-Endurance in Cruise')
+      plt.title('\\textbf{Payload-Endurance in Cruise}')
       plt.legend(loc='best')
       plt.tight_layout()
       # plt.savefig('cruise_endurance.png',format='png',dpi=150)
@@ -921,24 +934,24 @@ class vehicle_performance:
       plt.figure()
       for j in range(nV):
          V     = all_V[j]
-         plt.plot(tcruise[:,1,j]*0.06*V, payload,'-o',label='Vahana: V = ' + str(int(round(V,0))) + ' m/s',linewidth=2.0)
+         plt.plot(tcruise[:,1,j]*0.06*V, payload,'-o',label=str(int(round(V,0))) + ' m/s',linewidth=2.0)
          Range[:,1,j] = tcruise[:,1,j]*0.06*V
       for j in range(nV):
          V     = all_V[j]
          if(V == self.Vcruise):
-            plt.plot(tcruise[:,0,j]*0.06*V, payload,'--b',label='Ideal battery',linewidth=2.4,alpha=0.4)
+            plt.plot(tcruise[:,0,j]*0.06*V, payload,'-r',label=str(int(round(self.Vcruise,0))) + ' m/s, ideal battery',linewidth=2.4,alpha=0.4)
             Range[:,0,j] = tcruise[:,0,j]*0.06*V
 
       # plt.figure()
       # plt.plot(Range[:,0], payload,'-r',label='Ideal battery assumptions',linewidth=2.4,alpha=0.4)
       # plt.plot(Range[:,1], payload,'-o',label='Vahana: ',linewidth=2.4)
-      plt.plot(tref*self.Vcruise*0.06, mpay,'o',markeredgecolor='k',markersize=16,markerfacecolor='none',markeredgewidth=2.5)
-      plt.ylabel('Payload (kg)')
-      plt.xlabel('Cruise range (km)')
+      plt.plot(tref*self.Vcruise*0.06, mpay,'o',markeredgecolor='r',markersize=16,markerfacecolor='none',markeredgewidth=2.5)
+      plt.ylabel('\\textbf{Payload (kg)}')
+      plt.xlabel('\\textbf{Cruise range (km)}')
       plt.xlim([0,numpy.max(Range[:,0]*1.1)])
       plt.ylim([0,round(numpy.max(payload)*1.1,-2)])
       plt.grid(linestyle=':')
-      plt.title('Payload-Range [3 min hover]')
+      plt.title('\\textbf{Payload-Range [3 min hover]}')
       plt.legend(loc='best')
       plt.tight_layout()
       # plt.savefig('cruise_range.png',format='png',dpi=150)
@@ -948,9 +961,9 @@ class vehicle_performance:
 # driver function to launch plots
 #====================================================================
 
-   def make_plots(self):
+   def make_plots(self, design_id):
 
-      fname          = 'performance_design_' + str(self.design) + '.pdf'
+      fname          = 'performance_design_' + str(design_id) + '.pdf'
       with PdfPages(fname) as pdf:
          self.pdf    = pdf 
          self.power_curve()

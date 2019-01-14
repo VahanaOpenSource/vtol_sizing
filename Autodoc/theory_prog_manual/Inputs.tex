@@ -1,0 +1,424 @@
+\section{Input files}
+This section of the documentation details the inputs files and conventions that that are necessary to perform sizing. The two main input files are \textbf{input.yaml} and \textbf{defaults.yaml}.
+
+\subsection{\textbf{input.yaml}}
+
+This input file specifies the mission profile, vehicle configuration, propulsion type and masses of fixed weight groups (e.g., crew, payload, mission equipment). An example input.yaml file is shown below in various segments, and each input and its units are explained.
+
+\hydra \spc inputs and outputs are handled using \textbf{yaml} files through the \textbf{pyyaml} package. The yaml input files are converted to \python \spc dictionaries when read, allowing the inputs to be specified in any order. The main dictionaries in \textbf{input.yaml} are \textcolor{red}{\textbf{Sizing}}, \textcolor{red}{\textbf{Configuration}}, \textcolor{red}{\textbf{Mission}} and \textcolor{red}{\textbf{Aircraft}}. All four dictionaries must be present in \textbf{input.yaml}. An example file is shown below with the \textcolor{red}{\textbf{main dictionary names}} and \blue{sub-dictionary names} highlighted.
+
+\begin{lstlisting}
+<@\textcolor{red}{\textbf{Sizing:}}@>
+   <@\blue{Rotors:}@>
+      All_rotors:
+         Nb:         [3]                      # per rotor
+         Vtip:       [170]                    # hover tip speed, m/s
+         ctsigma:    [0.139]
+   <@\blue{Wings:}@>
+      Main_wing:
+         nwing:            [1]
+         aspectratio:      [5,6,7,8] 
+         cl:               [0.4,0.5,0.6]
+         liftfraction:     [0.9]
+         nrotors:          [6]
+      Tail:
+         nwing:            [1]
+         aspectratio:      [6]
+         cl:               [0.3]
+         nrotors:          [2]
+   Fuselage:
+      nrotors:      0
+# fidelity options for weight and performance models
+   ifea:               False    
+   use_bemt:           False
+
+<@\textcolor{red}{\textbf{Configuration:}}@>
+   Rotors:
+      All_rotors:    `All_motors' # motor group to drive this rotor group
+   Wings:
+      Main_wing:     `All_rotors' # what rotor group to use on this wing
+      Tail:          `All_rotors' # 
+
+# note: 4k95 = 1219.2 m, ISA + 27.92 C, 6k95 = 1828.8 m, ISA + 11.88 C
+# flight mode: 0-idle, 1-hover, 3-cruise
+<@\textcolor{red}{\textbf{Mission:}}@>
+   nsegments:          4
+   flight_mode:        ['hover','cruise', 'cruise','hover'   ]
+   time_seg:           [    1.5,       0,        0,    1.5   ]
+   start_altitude:     [    0.0,    00.0,        0,      0   ] # m
+   end_altitude:       [    0.0,     0.0,        0,      0   ] # m
+   delta_temp_isa:     [    0.0,     0.0,        0,      0   ] # centrigrade
+   cruise_speed:       [      0,      98,       98,      0   ] # knots
+   distance:           [      0,      50,       15,      0   ] # in km
+   add_payload:        [      0,       0,        0,      0   ] # 
+   segment_type:       [  `all',   `all',`reserve',   `all'  ] # 
+   sizing_order:       [      1,       2,        0,      0   ] # 
+   # fixed_GTOW:         1400.0
+<@\textcolor{red}{\textbf{Aircraft:}}@>
+   aircraftID: 2
+   # 1: SMR, 3: Coax, 4: Quadrotor (needs to be improved), 5: custom
+
+   # payload, crew (kg)
+   mass_payload:     320.0       # 250 kg payload + 70 kg margin
+   mass_crew:         0 
+   avionics:         79.2
+   common_equipment: 24.0        # HVAC systems - common for all PAX
+   common_per_pax:   00.0
+   pax_count:         0          # passengers (uses pax -> baggage map)
+
+   nrotor:            8 	# total number of rotors
+   npropeller:        0         # Cruise propeller count
+   engineType:       `electric_motor' 	   # engine parameters
+\end{lstlisting}
+\noindent Each main dictionary and its relevant inputs are discussed below.
+\subsubsection{\red{Sizing}}
+This dictionary specifies the values of high-level design variables to use for sizing the vehicle. Up to three sub-dictionaries (\textcolor{blue}{\textbf{Rotor, Wings and Fuselage}}) and two logical inputs for using higher-fidelity models constitute the sizing dictionary.
+
+\paragraph{Rotors}
+The \blue{Rotors} dictionary consists of sub-dictionaries, with each sub-dictionary corresponding to a rotor. Several instances of this rotor unit may exist on the vehicle; this detail is provided in the \red{Configuration} dictionary, detailed in the following sub-section.
+
+Each \blue{Rotor} group is determined by several sizing design variables. In the present example, the \blue{Rotor} sub-dictionary is 
+\begin{lstlisting}
+   <@\blue{Rotors:}@>
+      All_rotors:
+         Nb:         [3]                      # per rotor
+         Vtip:       [170, 180, 190]      # hover tip speed, m/s
+         ctsigma:    [0.13, 0.139]
+\end{lstlisting}
+This definition shows that there is one rotor group used in the vehicle called `All\_rotors', with three design variables to size rotors in this group:
+\begin{enumerate}
+\item Number of blades $N_b$ - single or multiple integers
+\item Tip speed $V_{\rm TIP}$ in m/s - list of floats
+\item Hover blade loading $C_T/\sigma$ = T/$(\rho N_b c R V_{\rm TIP}^2)$ - list of floats
+\end{enumerate}
+\textbf{Rotor radius:} If the rotor radius is specified, then it is set to the input value. If the disk loading is specified, rotor radius is calculated based on the vehicle weight, rotor thrust share and hover down-load (specified in \textbf{defaults.yaml}). 
+
+If the rotor disk loading in hover is not specified (keyword \textbf{DL}, lb/sq.ft) and the rotor radius (keyword \textbf{radius}, meters) is also not specified, the rotor is assumed to be mounted on a wing, and the size is set based on wing span (calculated in fixed wing sizing) and rotor tip clearance (specified in \textbf{defaults.yaml}). After calculating rotor radius, the tip speed is used to identify the mean \textbf{rotor blade chord}. If the rotor geometric solidity (keyword \textbf{solidity}) is specified, then the hover blade loading is calculated. Otherwise, the the hover blade loading (keyword \textbf{ctsigma}) must be specified, and the geometric solidity is calculated. Some additional inputs are rotor cruise RPM to hover RPM ratio (keyword \textbf{RPM\_ratio}), and first flap frequency in hover (keyword \textbf{fl\_freq}). If these inputs are not specified, then default values of $\Omega_C/\Omega_H$ = 0.5 and $\nu_\beta$=1.1/rev are assumed. 
+
+\paragraph{Wings}
+The \blue{Wings} dictionary consists of sub-dictionaries, with each sub-dictionary corresponding to a fixed wing type. Several instances of this fixed wing unit may exist on the vehicle; this detail is specified by the parameter \textbf{nwing}. In the example shown above, the \blue{Wings} dictionary is 
+
+\begin{lstlisting}
+   <@\blue{Wings:}@>
+      Main_wing:
+         nwing:            [1]
+         aspectratio:      [5,6,7,8] 
+         cl:               [0.4,0.5,0.6]
+         liftfraction:     [0.9]
+         nrotors:          [6]
+      Tail:
+         nwing:            [1]
+         aspectratio:      [6]
+         cl:               [0.3]
+         nrotors:          [2]
+\end{lstlisting}
+This input specifies one fixed wing called ``Main\_wing'', and another called ``Tail''. The number of wings is specified using the parameter \textbf{nwing}, which is usually 1. The input \textbf{nwing} =[2] is used for tandem-wing designs, where both the canard and main wing are of identical construction. The parameter \textbf{aspectratio} is the wing aspect ratio $b^2/S_{\rm wing}$, \textbf{cl} is the wing cruise lift coefficient and \textbf{liftfraction} is the fraction of vehicle weight carried by the wing group in cruise. Finally, the parameter \textbf{nrotors} specifies the number of rotors mounted on a wing of this group. Here, 6 rotors are mounted on the main wing, and 2 rotors are mounted on the tail. Each input parameter can be specified as a list of values to investigate. 
+
+\paragraph{High-fidelity model switches}
+The parameter \textbf{ifea} is a logical input, used to specify if the FEA-based weight model is to be used in the sizing loop to estimate the airframe structural weight. The other parameter \textbf{use\_bemt} indicates whether the Blade Element Momentum Theory (BEMT) should be used to refine rotor performance estimates in hover (and cruise for prop-rotors). In this example, both options are not enabled. 
+ 
+\subsubsection{\red{Vehicle configuration}}
+\begin{lstlisting}
+<@\textcolor{red}{\textbf{Configuration:}}@>
+   Rotors:
+      All_rotors:    `All_motors' # motor group to use to drive this rotor 
+   Wings:
+      Main_wing:     `All_rotors' # what rotor group to use on the main wing
+      Tail:          `All_rotors' # what rotor group to use on the tail
+\end{lstlisting}
+This dictionary specifies the vehicle configuration, and associations between wings/fuselage and rotors, and drive motors for each rotor group. In the example given above, the configuration dictionary is repeated below. The first sub-dictionary for the configuration specifies that rotors belonging to the group ``All\_rotors'' are driven by motors specified by a group called ``All\_motors''. The rotor group name corresponds to the string used to specify the rotor design variables in the \blue{Sizing} section. The second sub-dictionary for the vehicle configuration specifies that on the fixed wing called `Main\_wing', the rotors mounted on this structure are of the type ``All\_rotors''. Similarly, the ``Tail'' fixed wing features rotors of type ``All\_rotors''. 
+
+\subsubsection{\red{Mission profile}}
+The mission profile from \textbf{input.yaml} is repeated below for convenience:
+\begin{lstlisting}
+<@\textcolor{red}{\textbf{Mission:}}@>
+   nsegments:          4
+   flight_mode:        ['hover','cruise', 'cruise','hover'   ]
+   time_seg:           [    1.5,       0,        0,    1.5   ]
+   start_altitude:     [    0.0,    00.0,        0,      0   ] # m
+   end_altitude:       [    0.0,     0.0,        0,      0   ] # m
+   delta_temp_isa:     [    0.0,     0.0,        0,      0   ] # centrigrade
+   cruise_speed:       [      0,      98,       98,      0   ] # knots
+   distance:           [      0,      50,       15,      0   ] # in km
+   add_payload:        [      0,       0,        0,      0   ] # extra payload
+   segment_type:       [  `all',   `all',`reserve',   `all'  ] 
+   sizing_order:       [      1,       2,        0,      0   ] #
+   # fixed_GTOW:         1400.0
+\end{lstlisting}
+The parameter \textbf{nsegments} specifies the number of mission segments. Each segment type can be `hover' or `cruise', specified by the parameter \textbf{flight\_mode}. For hover segments, the duration is specified by the parameter \textbf{time\_seg}. For cruise segments, either the segment duration can be specified, or the \textbf{distance} can be provided as an input and the segment velocity \textbf{cruise\_speed} will be calculated. If the distance is provided as a non-zero input value, the cruise segment duration input is ignored. For climb segments, the start and end altitudes \textbf{start\_altitude}, \textbf{end\_altitude} are specified in meters. 
+
+The parameter \textbf{add\_payload} is used to inform the analysis that the payload has changed at the end of a mission segment (e.g., cargo picked up/dropped off or passenger disembarked/entered the vehicle). The input parameter \textbf{segment\_type} specifies the type of mission segment - `all' indicates the segment is used in day-to-day operations, while `reserve' indicates that the segment is used for sizing, nut not operating cost calculations. The parameter \textbf{sizing\_order} is a list of integers, with zero specifying that the segment is not used for sizing, and a non-zero integer specifying that the segment is used to size a particular component. Usually, the first hover segment and first cruise segment are used for sizing various components. The final line is an optional input specifying the parameter \textbf{fixed\_GTOW}. If this line is present, it instructs the analysis to run sizing in fixed take-off weight mode, and estimate the payload based on the remaining mass. 
+
+\subsubsection{\red{Aircraft}}
+
+The aircraft specification dictionary is repeated below for convenience. The payload mass, crew mass, common equipment and avionics mass are fixed mass groups, specified in kg. The parameter \textbf{common\_per\_pax} is the mass of equipment that is multiplied by the number of passengers, specified by \textbf{pax\_count}. Based on the number of passengers, additional payload is added internally with the following map: 150 kg for first passenger, 125 kg for next two passengers and 120 kg for the fourth and fifth passengers.
+
+The parameters \textbf{nrotor} and \textbf{npropeller} are outdated inputs. Finally, \textbf{engineType} specifies the powerplant that is used to store and produce mechanical energy. Valid entries are \emph{`electric\_motor'} (with Lithium ion battery), \emph{`turboshaft'} (with mechanical transmission), \emph{piston} (with mechanical transmission), \emph{turbo\_electric} (turboshaft with generator and electric motors) and \emph{piston\_electric} (piston engine with generator and electric motors). 
+
+\begin{lstlisting}
+<@\textcolor{red}{\textbf{Aircraft:}}@>
+   aircraftID: 2                 # 1: SMR, 3: Coax, 4: Quadrotor, 5: custom
+   mass_payload:     320.0       # 250 kg payload + 70 kg margin
+   mass_crew:         0 
+   avionics:         79.2
+   common_equipment: 24.0        # HVAC systems - common for all PAX
+   common_per_pax:   00.0
+   pax_count:         0          # passengers (uses pax -> baggage map)
+
+   nrotor:            8 	 # total number of rotors
+   npropeller:        0          # Cruise propeller count
+   engineType:       `electric_motor' 	   # engine parameters
+\end{lstlisting}
+
+\subsection{\textbf{defaults.yaml}}
+This input file contains the sizing constraints, motor efficiencies, powerplant details, calibration factors for empirical/reduced-order weight and peformance models and cost models. Also included are ``technology factors'', i.e., multipliers applied to weight predictions for each component. The file is too large to be printed verbatim as a whole unit; instead the text is subdivided into dictionary-sized segments, and each dictionary in this input file is detailed below.
+
+\subsubsection{\red{Sizing} dictionary}
+\begin{lstlisting}
+<@\red{Sizing:}@>
+   <@\blue{Constraints:}@>
+      max_rotor_radius:    12.0 # m
+      max_ct_sigma    :     0.14
+      max_gtow        :  5000.0 # kg
+\end{lstlisting}
+
+\blue{Constraints} used to size the vehicle are specified in this dictionary. The first parameter \textbf{max\_rotor\_radius} is the maximum rotor radius (for single main rotor helicopters) or the maximum vehicle footprint (for eVTOL). The parameter \textbf{max\_ct\_sigma} is the upper limit on rotor blade loading in hover. Finally, \textbf{max\_gtow} is the upper limit on take-off mass imposed for the vehicle. These constraints are imposed during optimization as well as iterative sizing. If any of these three constraints are violated during fixed-point iterations, the sizing loop is terminated and the design is marked ``invalid''.
+
+\subsubsection{\red{Empirical} parameters}
+This dictionary contains several sub-dictionaries, each of which are detailed below. A sample dictionary is broken into sub-dictionaries and explained below.
+
+\paragraph{\blue{Transmission}}
+\begin{lstlisting}
+<@\red{Empirical:}@> 			# Empirical modeling parameters
+   <@\blue{Transmission:}@>
+      eta:              1.00       # transmission efficiency
+\end{lstlisting}
+The parameter \textbf{eta} is a fraction between 0 and 1, quantifying the efficiency of the electrical/mechanical transmission. Both wires and driveshafts/gears feature upwards of 98\% efficiency.
+
+\paragraph{Electric motors}
+\begin{lstlisting}
+   <@\blue{Motors:}@>					#motor efficiencies
+      All_motors:
+         hover_efficiency: 0.90
+         cruise_efficiency: 0.85
+\end{lstlisting}
+
+Presently, the empirical parameters used for motor sizing are \textbf{hover\_efficiency} and \textbf{cruise\_efficiency}. In reality, prop-rotors may operate at significantly lower cruise RPMs, resulting in different electrical-to-mechanical energy conversion efficiencies for the electric motors and speed controllers. 
+
+\paragraph{\blue{Battery}}
+\begin{lstlisting}
+   <@\blue{Battery:}@>
+      Cell:
+         sp_energy:   240.0      # measured in W-hr/kg
+         Tmax:         70.0      # max cell temperature, deg C
+         energy_vol:  632.0      # energy density, Watt-hours/liter
+         volume:        0.01708  # volume of a cell unit, liters
+      Pack:
+         SOH:           0.8      # state of health; 0 = gone; 1 = brand new
+         DOD_min:       0.075    # minimum depth of discharge;
+         integ_fac:     0.75     # battery pack integration factor for mass 
+         vol_fac:       0.3      # battery volume integration factor 
+      Force_sizing:     `energy' # ignore cell count or temperature effects      
+\end{lstlisting}
+The \blue{battery} sub-dictionary features parameters to model individual cells, as well as the battery pack. The cell parameters are \textbf{sp\_energy} (maximum rated energy stored per unit cell mass), \textbf{Tmax} (maximum rated cell temperature), \textbf{energy\_vol} (rated energy per unit cell volume) and \textbf{volume} (unit cell volume in liters).
+
+The battery pack is quantified by the following parameters
+\begin{enumerate}
+\item State of health \textbf{SOH} - the maximum energy that can be stored in the pack, as a fraction of its rated energy. This parameter is usually less than unity because charge/discharge cycling of cells results in reduced energy storage capacity.
+\item Minimum depth of discharge \textbf{DOD\_min} - the minimum energy capacity that the pack must retain to avoid permanent set and reduced energy capacity in individual cells. 
+\item Pack mass integration factor \textbf{integ\_fac} - the ratio of battery cell mass to pack mass, to account for the battery casing and power management systems.
+\item Pack volume factor \textbf{vol\_fac} - the ratio of cell mass to battery pack mass, to account for additional components introduced by the mass integration factor, as well as clearances for cell cooling.
+\end{enumerate}
+
+Finally, the battery sizing option \textbf{Force\_sizing} is character input that directs the battery sizing module to ignores thermal effects and pack voltage constraints; if this input is present, only energy-based sizing is performed.
+
+\paragraph{\blue{Aerodynamics}}
+The \blue{aerodynamics} dictionary is used to specify rotor hover and cruise efficiencies, interference losses, wing efficiencies and body drag. A sample dictionary is shown below.
+
+
+\begin{lstlisting}
+   <@\blue{Aerodynamics:}@>
+      Rotors:
+         hover_dwld_factor:    0.015
+         cd0:                  0.012
+         induced_power_factor: 1.18
+         FM:                   0.75
+         kint:                 1.02
+         hover_thrust:         `equal'
+      Wings:
+         oswald:            0.8
+         cd0:               0.014
+      Propellers:
+         eta:               0.85
+      Body:
+         flat_plate_factor: 0.88       # means use drag build-up model
+\end{lstlisting}
+
+The Rotors sub-dictionary contains modeling constants to quantify hover efficiency
+\begin{enumerate}
+\item \textbf{hover\_dwld\_factor} is the additional fraction of nominal rotor lift share that the rotor has to produce in hover to overcome vertical down-load due to the rotor wake impinging on the structure of the vehicle
+\item \textbf{cd0} is the average profile drag coefficient of the rotor blade airfoil section
+\item \textbf{induced\_power\_factor} is the multiplier for ideal rotor power to account for non-ideal losses
+\item \textbf{FM} is the rotor hover figure of merit. If the hover figure of merit is given as non-zero, then \textbf{FM} is used to estimate rotor shaft power in hover. If the value of figure of merit is given as zero, then the profile drag coefficient and induced power factor are used to estimate rotor hover power. 
+\item \textbf{kint} is the rotor power scaling factor to account for interference losses. 
+\item \textbf{hover\_thrust} is a character input that ignores the calculated rotor lift share, and distributes the hover thrust equally across all rotors in the system. This input is primarily present for backward-compatibility, and should not be used extensively except for debugging.
+\end{enumerate}
+\noindent The empirical parameters used to model wing performance are the Oswald efficiency factor \textbf{oswald} (quantifies additional induced drag for non-elliptical span loading) and the mean profile drag coefficient \textbf{cd0}. The efficiencies of dedicated cruise propellers and prop-rotors in cruise is quantified by the \textbf{Propeller} parameter \textbf{eta}. Finally, the scaling factor to estimate body drag from weight using a weight-drag trendline is the parameter \textbf{flat\_plate\_factor}. If this input is zero, then the analysis uses a component drag build-up to estimate parasitic drag.
+
+\paragraph{\blue{Geometry}}
+\begin{lstlisting}
+   <@\blue{Geometry:}@>
+      fuselage_width:    1.00          # fuselage width in meters
+      fuselage_length:   7.00          # fuselage length in meters
+      clearance:         0.15          # rotor tip clearance / radius ratio
+\end{lstlisting}
+The three geometry parameters used for sizing are the fuselage width at the widest point \textbf{fuselage\_width} (meters), airframe length \textbf{fuselage\_length} (meters) and the rotor clearance parameters \textbf{clearance}. This final parameter is the in-plane clearance between a rotor plane and other rotor planes/vehicle fuselage.
+
+\paragraph{\blue{Technology factors}}
+The term technology factor refers to scaling factors (``multipliers'') used to increase or decrease component empty weights to account for improvements in lightweight manufacturing. A sample dictionary is shown below.
+
+\begin{lstlisting}
+   <@\blue{Tech\_factors:}@>
+      Weight_scaling:
+         rotor:            1.0            # rotor blades and hub
+         wing:             0.9           # wings
+         empennage:        1.0            # tail surfaces/winglets
+         fuselage:         1.0            # airframe structure
+         landing_gear:     0.4            #  
+         fuel_system:      1.0            # fuel pumps for engines
+         drive_system:     1.0            #  transmission
+         flight_control:   1.0            #  
+         anti_icing:       0.0            #  
+         powerplant:       0.76           # motors and engines
+         fuel:             1.0            # fuel
+         battery:          1.0            # battery
+\end{lstlisting}
+
+\subsubsection{\red{Acquisition} cost model}
+
+There are two types of costs associated with the rotorcraft that are modeled in \hydra: acquisition cost (component purchase) and operating cost. The dictionary \red{Acquisition} contains three sub-dictionaries: \blue{Fixed\_cost},  \blue{Scaling\_cost} and \blue{Beta\_acq\_factors}. Each of these dictionaries is detailed below with examples.
+
+\paragraph{\blue{Fixed acquisition cost}}
+\begin{lstlisting}
+<@\red{Acquisition:}@>
+   <@\blue{Fixed\_cost:}@>
+      sense_avoid:    189817.0            # USD 
+      avionics:       145807.0            # USD
+      interiors:       45152.0            # USD, air conditioning/heater/HUD
+      testing:          6400.0            # USD 
+\end{lstlisting}
+This sub-dictionary contains inputs for the cost of vehicle components that do not vary with vehicle size. These groups include the sense and avoid system, avionics, interiors and component testing.
+
+\paragraph{\blue{Scaling\_cost}}
+This sub-dictionary contains inputs for the cost of vehicle components that scale with the mass of each component. Several components fall under this category, particularly airframe, wings, landing gear, rotor blade structures, transmission lines and motors. A sample dictionary is shown below.
+
+\begin{lstlisting}
+   <@\blue{Scaling\_cost:}@>
+      final_assem_line:    90.07          # USD/kg of take-off mass 
+      BRS:                 10.885         # USD/kg of take-off mass 
+      fuselage:          2807.0           # USD/kg of fuselage weight
+      landing_gear:      1725.0           # USD/kg of landing gear strl.  weight
+      wing_structure:    3779.1           # USD/kg of wing     structural weight
+      motors:            2669.0           # USD/kg of drive motor mass 
+      power_dist:          31.0           # USD/kW of installed power
+      rotor_blade:      77605.0           # USD/sq.m of plan-form area
+      rotor_hub:        14133.0           # USD/kg: hub+collective actuator
+      wires:               20.3           # USD/kg of wire weight 
+      tilt_actuator:     2868.0           # USD/kg of tilt actuator weight 
+      wing_flap:         2619.0           # USD/kg of wing flap/aileron    
+\end{lstlisting}
+
+\paragraph{\blue{Acquisition cost scaling factors}}
+This dictionary deals with cost multipliers that account for reduction of component prices associated with mass-production. A value less than one indicates that the component is less expensive when manufactured in bulk.
+\begin{lstlisting}
+   <@\blue{Beta\_acq\_factors:}@>                    # acquisition cost multipliers 
+      sense_avoid:         0.5            
+      avionics:            0.75           
+      interiors:           1.0            # air conditioning/heater/HUD
+      testing:             1.0            
+      final_assem_line:    0.5            
+      BRS:                 0.75           
+      fuselage:            0.2            
+      landing_gear:        0.2            
+      wing_structure:      0.2            
+      motors:              0.2            
+      power_dist:          1.0            
+      rotor_blade:         0.2            
+      rotor_hub:           0.2            
+      wires:               1.0            
+      tilt_actuators:      0.75           
+      wing_flaps:          0.75           
+\end{lstlisting}
+
+\subsubsection{\red{Operations}}
+Operating costs are of two types: \blue{annual} and \blue{hourly} operating costs. These two components of the operating cost model are specified as sub-dictionaries under \red{Operations}. Additionally, the constants required to obtain \blue{battery} life cycle costs are also specified. Finally, \blue{vertiport} details are also specified and the cost of an eVTOL trip is compared to the cost of using a \blue{taxi} for traveling the same distance. Each of these sub-dictionaries are detailed below.
+
+\paragraph{\blue{Annual} costs}
+\begin{lstlisting}
+<@\red{Operations:}@>
+   <@\blue{Annual:}@>
+      Flight_hours:        1500              # flight hours per year
+      Liability:           22000             # USD liability insurance per year
+      Inspection:          7700           # USD, per year
+      Insurance_percent:   4.5               # insurance, % of acquisition 
+      Depreciation_percent: 10               # % of acquisition cost depr./year
+      Pilot:               280500            # USD, pilot cost to company/year
+      Training:            9900              # USD, pilot training/year
+\end{lstlisting}
+
+The number of flight hours per year (\textbf{Flight\_hours}) is used to calculate the equivalent cost per flight hour from the annual fixed costs incurred in ensuring vehicle airworthiness. The annual costs incurred are \textbf{Liability}, \textbf{Inspection}, insurance and depreciation (specified as a percentage of acquisition cost, \textbf{Insurance\_percent} and \textbf{Depreciation\_percent} respectively). For a piloted vehicle, additional costs are incurred for pilot salary and overhead (\textbf{Pilot}) as well as continuous training (\textbf{Training}). 
+
+\paragraph{\blue{Hourly} costs}
+This dictionary specifies the maintenance and inspection costs associated with operating an air vehicle. The three elements in this dictionary are 
+\begin{enumerate}
+\item Frame inspection (\textbf{Frame\_maintenance}): specified as a cost in currency per flight hour
+\item Rotor blades, collective actuator and hub inspection (\textbf{Rotor\_inspection}): specified as a cost in currency per flight hour per unit assembly
+\item Electric motor inspection (\textbf{Motor\_inspection}): specified as a cost in currency per flight hour per motor unit.
+\end{enumerate}
+
+\begin{lstlisting}
+   <@\blue{Hourly:}@>
+      Frame_maintenance:     37.35           # $/flight hr 
+      Rotor_inspection:       1.0            # $/flight hr/rotor 
+      Motor_inspection:       0.625          # $/flight hr/rotor 
+\end{lstlisting}
+
+\paragraph{\blue{Battery} costs}
+This dictionary specifies the number of charge/discharge \blue{Cycles} that a battery can withstand before its energy reduces to the design state of health specified in \red{Sizing} $\rightarrow$ \blue{Battery} $\rightarrow$ Pack $\rightarrow$ \textbf{SOH}. Additionally, the purchase price of a battery pack as well as the battery recharge cost are specified as cost per unit rated energy/cost per unit of energy (\textbf{Cost\_per\_kwh}, \textbf{Electricity} respectively).
+
+\begin{lstlisting}
+   <@\blue{Battery:}@>
+      Cycles:             900
+      Cost_per_kwh:       180.0              # battery cost/rated energy, $/kWh
+      Electricity:          0.20             # electricity/unit energy, $/kWh
+\end{lstlisting}
+
+\paragraph{\blue{Vertiport}}
+The relevant operational details at the vertiport are the landing tariffs (\textbf{Landing\_fees}) per touchdown, the distance from the vertiport to the final passenger destination (\textbf{Ground\_distance} in km) and the additional time spent in commuting to and from the vertiport changing modes of transport (\textbf{Padding\_time}).
+
+\begin{lstlisting}
+   <@\blue{Vertiport:}@>
+      Landing_fees:        20.0              # landing fee per flight, USD
+      Padding_time:        26.0              # min, curb -> UAM + UAM -> curb 
+      Ground_distance:      2.0              # last leg distance in km
+\end{lstlisting}
+
+\paragraph{\blue{Taxi} details}
+The details of a \blue{taxi} that can compete with a short-range aircraft are the tariff per unit distance traveled (\textbf{Distance\_rate} in currency per km), a time tariff (\textbf{Time\_rate} in currency per minute) and the additional time required to change from another mode of transport to the taxi (\textbf{Padding\_time}, minutes).
+\begin{lstlisting}
+   <@\blue{Taxi:}@>
+      Distance_rate:        0.55             # Taxi price in USD per km 
+      Time_rate:            0.36             # USD/minute of taxi ride
+      Padding_time:        15.0              # airport gate to curb, minutes
+\end{lstlisting}
+
+\subsubsection{\red{Redundant} systems}
+The dictionary \red{Redundancies} specifies components that feature doubly or triply redundant backups for flight controls, power cables and avionics. The redundancy factors are used to proportionally increase the component empty weights and associated group costs. 
+
+\begin{lstlisting}
+<@\red{Redundancies:}@>
+   wing_flap:              1.0 
+   tilt_actuator:          2.0
+   wires:                  1.0
+   avionics:               1.0
+\end{lstlisting}

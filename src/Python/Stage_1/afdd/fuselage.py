@@ -35,13 +35,16 @@ def fuselage_weight(vehicle_parameters):
    nz         = 3.5                               # loa factor
    fac        = vehicle_parameters['tech_factors'].fuselage
    wing       = vehicle_parameters['wing']
-   l_fus      = vehicle_parameters['l_fus']       # ft 
-   
+   l_fus      = vehicle_parameters['l_fus']       # meters
+   b_fus      = vehicle_parameters['b_fus']*f2m   # meters 
+   h_fus      = b_fus 
+
 #====================================================================
 # helicopter, compound or quad rotor /derivatives
 #====================================================================
 
-   S_body = 10**(c+d*log10(gtow))
+#   S_body = 10**(c+d*log10(gtow))
+   S_body     = (2*b_fus + 2*h_fus)*l_fus + 2*b_fus*h_fus 
    
 #====================================================================
 # AFDD84 Universal model

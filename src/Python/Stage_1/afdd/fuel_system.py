@@ -76,7 +76,7 @@ def fuel_system(vehicle_parameters):
 #====================================================================
 
 #   print total, w_fuel
-   if total < 0.5*w_fuel:
+   if total > 0.5*w_fuel:
       fuel_sys    = {'total': 0.5*w_fuel*fac*lb2kg} 
 
    return fuel_sys

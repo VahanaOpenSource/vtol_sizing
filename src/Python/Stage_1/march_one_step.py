@@ -4,7 +4,7 @@
 #====================================================================
 import copy
 import fea
-
+margin_frac       = 0.0
 class _march_one_step:
 
 #====================================================================
@@ -42,6 +42,8 @@ class _march_one_step:
       mission.totalenergyreqd       = 0.0
       mission.maxfuelflowrate       = 0.0
       mission.max_Peng              = 0.0
+
+      bfus                          = self.emp_data.Geometry.fuselage_width
 
 #====================================================================
 # Remember previous take-off mass
@@ -83,8 +85,9 @@ class _march_one_step:
 
          if(segment.flightmode == 'cruise' and update_c and segment.type != 'reserve'):
             W              = self.massTakeoff*g
-            temp1, temp2   = wing.cruise_sizing(W, segment, update_c)
-            update_c       = False 
+            if(bool(wing)):
+               temp1, temp2   = wing.cruise_sizing(W, segment, update_c, bfus)
+               update_c       = False 
 
 #====================================================================
 # Reset sizing switches
@@ -195,21 +198,35 @@ class _march_one_step:
 #
          if isinstance(self.massEmptyGroup[key],dict):
             massEmpty += self.massEmptyGroup[key]['total']
-#            print(key,self.massEmptyGroup[key]['total'])
+
 #=============================================================================
 # not a dictionary, but only a floating point
 #=============================================================================
 
          else:
             massEmpty += self.massEmptyGroup[key]
-#            print(key,self.massEmptyGroup[key])
-#      print(massEmpty,powerInstalled)
 
+#=============================================================================
+# error trap: helps debugging for negative mass
+#=============================================================================
+
+      if(massEmpty < 0):
+         print('power',self.p_ins)
+         for k,v in self.massEmptyGroup.items():
+            if(isinstance(v,dict)):
+               print(k,v['total'])
+               if(v['total'] < 0):
+                  print('AHA')
+                  print(v)
+            else:
+               print(k,v)
+
+         quit('BANG: negative empty weights')
 #=============================================================================
 # add empty weight margin: 10% of empty weight
 #=============================================================================
 
-      self.massEmptyGroup['margin']    = 0.1*massEmpty
+      self.massEmptyGroup['margin']    = margin_frac*massEmpty
       massEmpty                        = massEmpty + self.massEmptyGroup['margin']
 
 #=============================================================================
@@ -228,30 +245,15 @@ class _march_one_step:
          error                      = abs(self.massTakeoff - old_takeoff_mass)/(old_takeoff_mass+0.01)
 
 #=============================================================================
-# iteration type 2: fixed GTOW, variable payload
-# calculate payload from (take off - empty - fuel reqd)
+# iteration type 2: fixed GTOW, variable payload/margin
+#        payload = (take off - empty - fuel reqd)
 #=============================================================================
 
       elif sizing_mode == 2:
          massPayload                      = self.massTakeoff - self.massempty - massFuelTotal - self.mass_battery
          error                            = abs(massPayload - old_payload_mass)/(old_payload_mass+0.01)
          mission.payload                  = massPayload     
-
-#=============================================================================
-# for negative payload, identify Chewbacca designs
-#=============================================================================
-
-#         if massPayload < 1.e-3:
-#            icontinue               = 0
-#            self.errmsg             = 'negative payload'
-
-#=============================================================================
-# if design is converged but blade design is infeasible, trigger flag to
-# discontinue iterations
-#=============================================================================
-
-#      print('error is ',error,massPayload,old_payload_mass)
-
+         #print(self.massTakeoff, self.massempty,massPayload)            
 #====================================================================
 # run only one iteration if sizing eVTOL with no payload drop during 
 # mission, when in fixed take-off weight mode; don't need more!
@@ -260,6 +262,12 @@ class _march_one_step:
       if(sizing_mode == 2 and mission.same_weight and self.etype == 'electric_motor'):
             error = 0.0
 
+#====================================================================
+# update footprint
+#====================================================================
+
+      self.footprint_update()
+      
 #====================================================================
 # Convergence check 
 #====================================================================

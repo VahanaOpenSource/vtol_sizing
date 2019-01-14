@@ -73,7 +73,7 @@ Empirical:
          eta:               0.85
 
       Body:
-         flat_plate_factor: 0.88       # means use drag build-up model
+         flat_plate_factor: 0.00       # means use drag build-up model
 
 # Geometry parameters
    Geometry:

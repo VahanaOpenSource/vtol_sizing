@@ -88,9 +88,9 @@ class _find_f:
 #=============================================================================
 
         if group.type == 'tilting':
-            rspin           = 0.12*radius
+            rspin           = 0.15*radius
             Sf              = pi*rspin*rspin           # reference area of spinner
-            f_spin          = Sf*0.12                  # drag coefficient with spinner head
+            f_spin          = Sf*0.15                  # drag coefficient with spinner head
             f_all['spin']   = f_all['spin'] + f_spin*NR
 
 #=============================================================================

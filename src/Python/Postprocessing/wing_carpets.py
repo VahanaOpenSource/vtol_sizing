@@ -10,6 +10,8 @@ def wing_carpets(A,B,Z,X,Y,save_file,valid,cstr,xstr,ystr):
     maxval          = round(max(Z),-1)
     wtstep          = (maxval-minval)/10
 
+#    offline.init_notebook_mode(connected=True)
+    print('carpet range is ',minval,maxval,wtstep)
 #define the font
     # font1 =dict(
     #     family='Courier New, monospace',
@@ -78,7 +80,7 @@ def wing_carpets(A,B,Z,X,Y,save_file,valid,cstr,xstr,ystr):
     v   = [i for i, x in enumerate(valid) if x == 1]
     x   = X[v]
     y   = Y[v]
-    print(v)
+#    print(v)
     trace3 =     go.Scatter(
             mode        = 'markers',
             x           = x,
@@ -96,7 +98,7 @@ def wing_carpets(A,B,Z,X,Y,save_file,valid,cstr,xstr,ystr):
     lowest      = min(Zlist)
     ihigh       = [ list(Z).index(highest) ]
     ilow        = [ list(Z).index(lowest)  ]
-    print(ihigh,ilow,highest,lowest)
+#    print(ihigh,ilow,highest,lowest)
     trace4 =     go.Scatter(
             mode    = 'markers',
             x       = X[ilow], 

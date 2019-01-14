@@ -14,7 +14,7 @@ from empennage       import empennage_weight    # AFDD82
 from flight_controls import flightctrl_weight   # AFDD82
 from fuel_system     import fuel_system         # AFDD82
 from fixed_wing      import fixed_wing_wt       # AFDD93 
-#from fuselage        import fuselage_weight     # AFDD84
+from fuselage        import fuselage_weight     # AFDD84
 from fuselage_v2     import fuselage_v2         # GB/ZL model
 from icing           import icing_weight        # refer NDARC v1_11
 from rotor_wt        import rotor_weight        # AFDD82
@@ -32,10 +32,11 @@ class _empty_weight:
         aircraft     = self.all_dict['aircraft']
         aid          = aircraft['aircraftID']
         wing         = self.wing
+        rotor        = self.rotor 
+        motor        = self.motor
         prop         = self.prop 
         p_ins        = self.p_ins     # installed power, in kW
         emp_data     = self.emp_data
-        rotor        = self.rotor 
         tech_factors = emp_data.Tech_factors.Weight_scaling
 
 #====================================================================
@@ -67,7 +68,7 @@ class _empty_weight:
 
         powerplant      = self.getEngineWeight()
 
-        l_fus           = 0.5*wing.max_span
+        l_fus           = emp_data.Geometry.fuselage_length
 
 #====================================================================
 # calculate costs of battery and motor
@@ -97,6 +98,7 @@ class _empty_weight:
                    'wing_tip_wt'   : self.wingtip_mass*kg2lb,
                    'tech_factors'  : tech_factors,
                    'b_fus'         : emp_data.Geometry.fuselage_width*m2f,
+                   'clearance'     : emp_data.Geometry.clearance,
                    'l_fus'         : l_fus, 
                    'wing'          : self.wing, 
                    'wt_redund'     : self.wt_redund}  
@@ -171,7 +173,12 @@ class _empty_weight:
 #====================================================================
 
         Volume            = 0.0
+
+#v1.0: statistical model
+        # fuselage          = fuselage_weight(vparams)
+#v2.0: component build up
         fuselage          = fuselage_v2(vparams)
+
         Volume            = Volume + fuselage['total']/1400.0 
 
         alighting         = alighting_weight(self.massTakeoff, tech_factors)
@@ -250,9 +257,13 @@ class _empty_weight:
 # Wing weight model: size for target frequency
 #====================================================================
 
-        empennage       = empennage_weight(wing, tech_factors)
+        wing_wt, wires  = fixed_wing_wt(vparams, wing, rotor, motor)
 
-        wing_wt, wires  = fixed_wing_wt(vparams)
+#====================================================================
+# Empennage weight model: after wing weight
+#====================================================================
+
+        empennage       = empennage_weight(wing, tech_factors)
 
 #====================================================================
 # collect empty weights into dictionary of dictionaries; all kgs

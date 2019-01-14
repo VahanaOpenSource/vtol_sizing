@@ -80,10 +80,13 @@ class _hovermodel:
 
       if rotor_group.thrust_share == 'equal':
          thrust      = W*(1+hvrDwldFactor)/rotor.nrotors
-         print('hacking hover thrust to be equal for all rotors')
+         # print('hacking hover thrust to be equal for all rotors')
       else:
          thrust      = W*lift_frac*(1.0+hvrDwldFactor)/nrotors       # thrust per rotor in the group
 
+#      if(thrust < 0):
+#         print(W)
+#         quit('BANG')
 #====================================================================
 # get motor group information (efficiencies)
 #====================================================================
@@ -155,7 +158,7 @@ class _hovermodel:
 # total rotor areas available for propulsive thrust
 # If there are no horizontal-axis propellers, tilt the body
 #====================================================================
-      
+
       Athrust             = rotor.Atilt + rotor.Acruise     # cruise 
       Alift               = rotor.Atilt + rotor.Alift       # total disk area available to hover
 
@@ -191,6 +194,7 @@ class _hovermodel:
 # Set vertical and horizontal force requirements based on area ratios
 #====================================================================
 
+         # print('YO',group.type)
          if(group.type == 'cruise'):
             group.Arat_lift   = 0.0                   # no vertical force from this group
             group.Arat_thrust = Agroup/Athrust        # no thrust from this group
@@ -224,6 +228,7 @@ class _hovermodel:
 #====================================================================
 
    if (aircraftID == 1):
+      quit('not yet ready: tail rotor power in hover')
       mission.segment[iseg].p_req *= 1.1
 
    return icontinue

@@ -10,6 +10,8 @@
 
 import numpy 
 import hydra
+kts2mps  = 0.5144e0 
+
 #====================================================================
 # Begin function
 #====================================================================
@@ -29,42 +31,52 @@ class all_segments:
       self.max_c_rating    = 0.0
       self.duration        = 0.0
       self.same_weight     = True  
-      n                    = self.nseg
-      lst                  = mission_data['sizing_order']
-      sizing_seg_ids       = []
-      non_sizing_seg_ids   = []
       self.sizing_order    = []
-      for i in range(n):                       # loop over sorted vals
-         size_id           = lst[i]
-         if size_id > 0:                        # actual sizing 
-            sizing_seg_ids.append(i)
-         else:
-            non_sizing_seg_ids.append(i)
-      lst                  = numpy.asarray(lst)
-      sizing_ord_lst       = numpy.asarray(lst[sizing_seg_ids])      # segment ids used for sizing
-      sizing_ord_ids       = numpy.argsort(sizing_ord_lst)           # list indices of segments used for sizing
-      nsize                = len(sizing_ord_ids)
-      for idval in sizing_ord_ids:
-         sizing_seg_id     = sizing_seg_ids[idval] 
-         self.sizing_order.append(sizing_seg_id)
-      for idval in non_sizing_seg_ids:
-         self.sizing_order.append(idval)
+      n                    = self.nseg
+      try:
+         lst                  = mission_data['sizing_order']
+         sizing_seg_ids       = []
+         non_sizing_seg_ids   = []
+         for i in range(n):                       # loop over sorted vals
+            size_id           = lst[i]
+            if size_id > 0:                        # actual sizing 
+               sizing_seg_ids.append(i)
+            else:
+               non_sizing_seg_ids.append(i)
+         lst                  = numpy.asarray(lst)
+         sizing_ord_lst       = numpy.asarray(lst[sizing_seg_ids])      # segment ids used for sizing
+         sizing_ord_ids       = numpy.argsort(sizing_ord_lst)           # list indices of segments used for sizing
+         nsize                = len(sizing_ord_ids)
+         for idval in sizing_ord_ids:
+            sizing_seg_id     = sizing_seg_ids[idval] 
+            self.sizing_order.append(sizing_seg_id)
+         for idval in non_sizing_seg_ids:
+            self.sizing_order.append(idval)
+      except:
+         for i in range(n):
+            self.sizing_order.append(i)
 
       self.cost_duration   = 0.0
+      self.cost_range      = 0.0
       for i in range(n):
          self.segment[i]   = mission_segment(mission_data, i, payload)
 
-         self.duration    += self.segment[i].time 
+         segment           = self.segment[i]
+         self.duration    += segment.time 
 
-         if(self.segment[i].type != 'reserve'):
-            self.cost_duration   = self.cost_duration + self.segment[i].time 
-            
+         if(segment.type != 'reserve'):
+            self.cost_duration   = self.cost_duration + segment.time 
+
+            distance             = max(segment.distance,segment.time*segment.cruisespeed/60.0)
+            self.cost_range      = self.cost_range    + distance       # in kilometers
+
 #====================================================================
 # see which segment comes first: cruise or hover
 # If cruise comes first, then do span-driven sizing of rotors
 # do not honor the rotor disk loading or radius inputs in that case
 #====================================================================
 
+      print('segment sizing order is ',self.sizing_order)
       for i_priority in range(n):
          iseg       = self.sizing_order[i_priority]
          flt_mode   = self.segment[iseg].flightmode 

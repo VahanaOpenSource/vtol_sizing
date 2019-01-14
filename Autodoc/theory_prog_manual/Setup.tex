@@ -1,0 +1,98 @@
+\section{First-time setup}
+\subsection{Installing pre-requisites}
+For Debian-based Linux distributions, you can get \ty{Python3}, CMake and gfortran using the command 
+\begin{center}
+\textbf{sudo apt-get install python3 cmake gfortran texlive-fonts-extra}
+\end{center}
+
+For MacOS, similar commands can be executed with brew. 
+
+After installing \ty{Python3}, install various modules using \ty{pip}
+
+\begin{center}
+\textbf{sudo python3 -m pip install numpy} \\
+\textbf{sudo python3 -m pip install scipy} 
+\end{center}
+
+In a similar manner, install the other modules with a terminal.
+
+
+\subsection{Compiling source code}
+After installing the pre-requisites, create the directory \textbf{cmake/build/} as follows
+
+\begin{center}
+\textbf{cd cmake/} \\
+\textbf{mkdir build/}\\
+\textbf{cd build/} 
+\end{center}
+
+Then, execute the cmake command and compile the code
+\begin{center}
+\textbf{FC=gfortran cmake ../../} \\
+\textbf{make -j} 
+\end{center}
+
+\subsection{MacOS-specific issues}
+
+Hopefully, there are no issues and the build process executes successfully. However, if it does not, and you are reading this, chances are that you are using Windows, or Mac. For Windows, there is a long and complicated series of steps documented here:
+\texttt{https://github.com/jameskermode/f90wrap/issues/73}
+
+For MacOS, the system may not recognize the \ty{f90wrap}  and \ty{f2py-f90wrap} commands even if the \textbf{f90wrap} module is installed - this issue was noticed for OSX High Sierra and v3.7 of \python. In case this situation arises, you may have to create symbolic links to these two commands in \ty{/usr/local/bin/}. For example, Ananth had to create a symlink as follows:
+
+\begin{enumerate}
+\item Identify where \textbf{f90wrap} is installed: use the following command in terminal
+\begin{center}
+\textbf{python3 -m site}\\
+\end{center}
+If \ty{Python3} is installed correctly, you will see an output that looks like this: \\
+\begin{lstlisting}
+sys.path = [
+    '/usr/local/bin',
+    '/usr/local/Cellar/python/3.7.0/Frameworks/Python.framework/Versions/3.7/lib/python37.zip',
+    '/usr/local/Cellar/python/3.7.0/Frameworks/Python.framework/Versions/3.7/lib/python3.7',
+    '/usr/local/Cellar/python/3.7.0/Frameworks/Python.framework/Versions/3.7/lib/python3.7/lib-dynload',
+    '/usr/local/lib/python3.7/site-packages',
+    '/usr/local/lib/python3.7/site-packages/RBF-2018.10.31-py3.7-macosx-10.13-x86_64.egg',
+    '/usr/local/Cellar/python/3.7.0/Frameworks/Python.framework/Versions/3.7/lib/python3.7/site-packages',
+    '/usr/local/Cellar/python/3.7.0/Frameworks/Python.framework/Versions/3.7/lib/python3.7/site-packages/RBF-2018.10.31-py3.7-macosx-10.13-x86_64.egg',
+]
+USER_BASE: '/Users/ananthsridharan/Library/Python/3.7' (doesn't exist)
+USER_SITE: '/Users/ananthsridharan/Library/Python/3.7/lib/python/site-packages' (doesn't exist)
+ENABLE_USER_SITE: True
+\end{lstlisting}
+
+The results of this command show that \textbf{f90wrap} may be found in
+\begin{lstlisting}
+/usr/local/Cellar/python/3.7.0/Frameworks/Python.framework/Versions/3.7/bin/
+\end{lstlisting}
+
+To verify that the \textbf{f90wrap} and \textbf{f2py-f90wrap} commands can indeed be located in that folder, use the \textbf{ls} command as follows: (without the linebreak)
+\begin{center}
+\textbf{ls /usr/local/Cellar/python/3.7.0/Frameworks/\\
+Python.framework/Versions/3.7/bin/*f90wrap}
+\end{center}
+You should see an output that looks like this:
+\begin{lstlisting}
+/usr/local/Cellar/python/3.7.0/Frameworks/Python.framework/Versions/3.7/bin/f2py-f90wrap
+/usr/local/Cellar/python/3.7.0/Frameworks/Python.framework/Versions/3.7/bin/f90wrap
+\end{lstlisting}
+
+Now, we're ready to use the \textbf{ln} command to create symlinks. 
+
+\item First, create a link for f90wrap:
+
+\begin{center}
+\textbf{ln -s /usr/local/Cellar/python/3.7.0/Frameworks/ \\
+Python.framework/Versions/3.7/bin/f90wrap /usr/local/bin} \\
+\end{center}
+
+\item Next, create a link for f2py-f90wrap:
+
+\begin{center}
+\textbf{ln -s /usr/local/Cellar/python/3.7.0/Frameworks/ \\
+Python.framework/Versions/3.7/bin/f2py-f90wrap /usr/local/bin} \\
+\end{center}
+
+\end{enumerate}
+
+Then, try deleting the build directory and redo all the compilation steps. 

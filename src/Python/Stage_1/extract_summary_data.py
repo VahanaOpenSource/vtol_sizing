@@ -92,7 +92,7 @@ class _postprocessor:
    self.costs.power_scaling_elements(self.p_ins)
    self.costs.rotor_acq_cost(self.rotor.groups)
    self.costs.cost_accumulation(self.engine.E_operations, self.massempty, self.engine.Eins)
-
+   
 #=========================================================================   
 # calculate operating cost of vehicle in USD/flight hour
 #=========================================================================   

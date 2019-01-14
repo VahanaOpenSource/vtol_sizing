@@ -14,10 +14,13 @@ material                = fea.material
 current                 = fea.currentvalues
 ndof_beam               = layout.ndof_beam
 
-from   mpi4py import MPI
-comm  = MPI.COMM_WORLD
-rank  = comm.Get_rank()
-
+try:
+   from   mpi4py import MPI
+   comm  = MPI.COMM_WORLD
+   rank  = comm.Get_rank()
+except:
+   rank  = 0
+   
 class _airframeconfig:
 
 #====================================================================

@@ -25,7 +25,7 @@ def alighting_weight(mass, tech_factors):
    mass_lg    = mass*f_lg*fac
    mass_fair  = mass*f_fa
    total 	  = mass_lg + mass_fair
-   wght_lg 	  = {'gear_structure':mass_lg, 'fairing': mass_fair, 'total': total}
+   wght_lg 	  = {'structure':mass_lg, 'fairing': mass_fair, 'total': total}
    return wght_lg
 
 #====================================================================

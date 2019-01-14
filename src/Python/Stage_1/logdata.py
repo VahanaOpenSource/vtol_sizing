@@ -51,6 +51,7 @@ class _logdata:
       f.write("   {:25s} {:d} \n"            .format('aircraftID:',adict['aircraftID']) )
       f.write("   {:25s} {:.2f} # [kg]\n"    .format('take_off_mass:',self.massTakeoff))
       f.write("   {:25s} {:.1f} # [kW]\n"    .format('power_installed:',self.p_ins))     # mechanical power available at rotor
+      f.write("   {:25s} {:.2f} # [m] \n"    .format('D-value:',self.footprint) )
       f.write("   {:25s} {:.2f} # [Lift to Drag ratio]\n"   .format('Cruise_LbyD:',self.LbyD) )
 
 #==============================
@@ -78,12 +79,13 @@ class _logdata:
             f.write("      {:20s} {:.2f} # [lb/ft2]\n" .format('disk_loading:',group.diskloading/std.grav * std.kg2lb / (std.m2f**2)) )
             f.write("      {:20s} {:.2f} \n"           .format('aspect_ratio:', group.aspectratio))
             f.write("      {:20s} {:.2f} # [m]\n"      .format('radius:',group.radius))
+            # print('radius is ')
             f.write("      {:20s} {:.3f} # [m]\n"      .format('chord:',group.chord ))
             f.write("      {:20s} {:.1f} # [m/s]\n"    .format('tip_speed:',group.tipspeed))
             f.write("      {:20s} {:.3f} \n"           .format('hover_FM:', group.fm))
             f.write("      {:20s} {:.3f} \n"           .format('cruise_rpm_ratio:', group.RPM_ratio))
             f.write("      {:20s} {:.3f} \n"           .format('eta_xmsn:', self.engine.eta_xmsn))
-            f.write("      {:20s} {:.3f} \n"           .format('solidity:', group.solidity))
+            f.write("      {:20s} {:.5f} \n"           .format('solidity:', group.solidity))
             f.write("      {:20s} {:.3f} \n"           .format('cd0:', group.cd0))
             f.write("      {:20s} {:.3f} \n"           .format('ipf:', group.ipf))
             f.write("      {:20s} {:.3f}\n"            .format('hvr_dwld:',group.hvr_dwld))
@@ -142,7 +144,7 @@ class _logdata:
 # fixed cost breakdown
 #==============================
 
-      f.write("   {:20s} [{:.6f}] # [USD]\n"    .format('Fixed_operating_costs:',c.fixed_costs))     # acquisition cost
+      f.write("   {:20s} [{:.3f}] # [USD]\n"    .format('Fixed_operating_costs:',c.fixed_costs))     # acquisition cost
       f.write("   {:20s} \n"    .format('fixed_cost_breakdown:'))    # cost breakdown
       for key in sorted(c.fix_breakdown.keys()):
             temp = c.fix_breakdown[key]
@@ -157,6 +159,16 @@ class _logdata:
       for key in sorted(c.var_breakdown.keys()):
             temp = c.var_breakdown[key]
             f.write("      {:16s}: [{:15.3f}         , {:6.3f}] # [USD/hr, % variable cost]\n".format(key,temp,temp/c.variable_costs*100))
+
+#==============================
+# time comparison vs. taxi
+#==============================
+
+      f.write("   {:20s} [{:15.3f}] # [minutes    ]\n"    .format('UAM_time:',c.UAM_time))           # variable costs, $/hr
+      f.write("   {:20s} [{:15.3f}] # [minutes    ]\n"    .format('Taxi_time:',c.Taxi_time))         # variable costs, $/hr
+      f.write("   {:20s} [{:15.3f}] # [USD        ]\n"    .format('UAM_trip_cost:',c.UAM_cost))         # variable costs, $/hr
+      f.write("   {:20s} [{:15.3f}] # [USD        ]\n"    .format('Taxi_trip_cost:',c.taxi_cost))         # variable costs, $/hr
+      f.write("   {:20s} [{:15.3f}] # [$/min saved]\n"    .format('Time_value:',c.dollar_per_min))   # variable costs, $/hr
 
 #==============================
 # Weight breakdown
@@ -185,7 +197,7 @@ class _logdata:
 
          elif mtemp > 1.e-5: # check minimum mass
             f.write("      {:16s}: [{:6.1f}         ,{:6.1f}] # [kg, %GTOW]\n".format(key,mtemp,mtemp/self.massTakeoff*100.0))
-
+            
 #==============================
 # fuel & payload
 #==============================
@@ -252,17 +264,17 @@ class _logdata:
 
       f.write("   {:20s} [".format('start_alt:' ))
       for n in range(nsegments):
-         f.write('{:10.0f} '.format(m.segment[n].startalt * std.m2f))
+         f.write('{:10.0f} '.format(m.segment[n].startalt))
          if n < nsegments-1:
             f.write(',')
-      f.write('] #[ft]\n')
+      f.write('] #[m]\n')
 
       f.write("   {:20s} [".format('end_alt:' ))
       for n in range(nsegments):
-         f.write('{:10.0f} '.format(m.segment[n].endalt * std.m2f))
+         f.write('{:10.0f} '.format(m.segment[n].endalt))
          if n < nsegments-1:
             f.write(',')
-      f.write('] #[ft]\n')
+      f.write('] #[m]\n')
 
       f.write("   {:20s} [".format('delta_temp_ISA:' ))
       for n in range(nsegments):
@@ -280,7 +292,7 @@ class _logdata:
 
       f.write("   {:20s} [".format('cruise_speed:' ))
       for n in range(nsegments):
-         f.write('{:10.0f} '.format(m.segment[n].cruisespeed))
+         f.write('{:10.2f} '.format(m.segment[n].cruisespeed))
          if n < nsegments-1:
             f.write(',')
       f.write('] #[knots]\n')

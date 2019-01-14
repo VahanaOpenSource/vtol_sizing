@@ -1,0 +1,239 @@
+alpha_deg: !!python/object/apply:numpy.core.multiarray._reconstruct
+  args:
+  - &id001 !!python/name:numpy.ndarray ''
+  - !!python/tuple
+    - 0
+  - !!binary |
+    Yg==
+  state: !!python/tuple
+  - 1
+  - !!python/tuple
+    - 40
+  - !!python/object/apply:numpy.dtype
+    args:
+    - f8
+    - 0
+    - 1
+    state: !!python/tuple
+    - 3
+    - <
+    - null
+    - null
+    - null
+    - -1
+    - -1
+    - 0
+  - false
+  - !!binary |
+    ZQDtH0vkMMDNBRCkEWctwNfzQWPGQynARc6Mb6BgJcAjgdTA4rkhwGy3VONSkRzAn2tdS3ZjEsBD
+    Lmff4xsJwNe0Bo0qNP2/PWfJEH6B5L/qVd96IUjaPxAxsforgfU//BEMbu2gAUAaL6fJuO4HQAIC
+    gHgkrA1AF4c3aftqEUAkw9geAboTQD8xSxyFyBVA0EBG5NuZF0Ds/FWCvDEZQIfjqkIQlBpAVQd3
+    ZmXEG0DK31A3hhQdQOAqkPugBx9AwE2Q3i1qIECMLXkpGD4hQFu6BRqF/SFANLgcv16tIkACdUn9
+    jUsjQDNvsAdr2CNA5NDCx6JUJEBw/CUnVL8kQALl67xaFyVAUWnGoOhaJUBpaSmqroYlQLkMVkiM
+    lCVAu6Hmsil3JUBMQxHvNRYlQMz4cFkBJCRAzp8ndjwmIUA=
+chord_m: !!python/object/apply:numpy.core.multiarray._reconstruct
+  args:
+  - *id001
+  - !!python/tuple
+    - 0
+  - !!binary |
+    Yg==
+  state: !!python/tuple
+  - 1
+  - !!python/tuple
+    - 40
+  - !!python/object/apply:numpy.dtype
+    args:
+    - f8
+    - 0
+    - 1
+    state: !!python/tuple
+    - 3
+    - <
+    - null
+    - null
+    - null
+    - -1
+    - -1
+    - 0
+  - false
+  - !!binary |
+    Xs8EsqsatD/tmr9JScezP3xmeuHmc7M/DDI1eYQgsz+b/e8QIs2yPyvJqqi/ebI/upRlQF0msj9J
+    YCDY+tKxP9kr22+Yf7E/aPeVBzYssT/4wlCf09iwP4eOCzdxhbA/FlrGzg4ysD9MSwLNWL2vP2ri
+    d/yTFq8/iXntK89vrj+oEGNbCsmtP8en2IpFIq0/5j5OuoB7rD8E1sPpu9SrPyRtORn3Las/QgSv
+    SDKHqj9hmyR4beCpP4AymqeoOak/n8kP1+OSqD+9YIUGH+ynP9z3+jVaRac//I5wZZWepj8aJuaU
+    0PelPzm9W8QLUaU/WFTR80aqpD9260YjggOkP5WCvFK9XKM/tBkygvi1oj/TsKexMw+iP/JHHeFu
+    aKE/EN+SEKrBoD8vdghA5RqgP5wa/N5A6J4/2kjnPbeanT8=
+dcpdr: !!python/object/apply:numpy.core.multiarray._reconstruct
+  args:
+  - *id001
+  - !!python/tuple
+    - 0
+  - !!binary |
+    Yg==
+  state: !!python/tuple
+  - 1
+  - !!python/tuple
+    - 40
+  - !!python/object/apply:numpy.dtype
+    args:
+    - f8
+    - 0
+    - 1
+    state: !!python/tuple
+    - 3
+    - <
+    - null
+    - null
+    - null
+    - -1
+    - -1
+    - 0
+  - false
+  - !!binary |
+    pqCyctwVOb9BlSfkKsU0v68/3bN/bSm/VrzSd5cX9L6OGWStsscpP3xXefv8JDs/7dQQ+mKiVL8W
+    qAzWgBRQvytL6Ihi+0O/toJlSnxXJb/rbVOZsxw5P2MrVK8byVA/Uq1qXvlrWz8IeoEpmghjP7rP
+    tBaHWWg/bSnZij+2bT80uZxFPI1xP7RwLNlkOXQ/shGz8yDgdj9dM0aPwYB5Pz4QI2O7E3w/3PXk
+    ODeSfj/oGIQik6yAP2yZ9K5GgYI/AOeZToNMhD9zypS0iwqGP2gUYO/Qvoc/fET7QrtiiT/7xUZY
+    SfiKP1iDza3tfIw/IBAZcyDqjT/dDK/c4D+PP6rrFT64PpA/n7q/AA7QkD+3leWob1KRP5+Tu+T6
+    w5E/mEWTroohkj+Y39FtHmaSP6vbP4aYgJI/SqULRsjZkT8=
+dctdr: !!python/object/apply:numpy.core.multiarray._reconstruct
+  args:
+  - *id001
+  - !!python/tuple
+    - 0
+  - !!binary |
+    Yg==
+  state: !!python/tuple
+  - 1
+  - !!python/tuple
+    - 40
+  - !!python/object/apply:numpy.dtype
+    args:
+    - f8
+    - 0
+    - 1
+    state: !!python/tuple
+    - 3
+    - <
+    - null
+    - null
+    - null
+    - -1
+    - -1
+    - 0
+  - false
+  - !!binary |
+    RZWnjmqDb7/KonscQX9rv7NEv+9DEWa/+W71gao1X7/pcICUw/FQvxXlmeMCNye/U9Y0PIC8cL+a
+    Mno6q1hrv0NI5eLQYGO/muLfTAnJU7+hRlOJh0guPxto0rEyDF8/mz8LeV/hbD8BZcr8Su90P7Ay
+    nOL6Rns/oV4jja7QgD/+hL3CYfyDP8vBiXeKHYc/K19lnC4yij9eiepkeTaNP9rmi3QHEpA/Qc1S
+    yhx6kT+6arwY0weTP4DftAV3EpU/NtJRPtYKlz90eVuDZOyYPy3/yR2fvJo/0jFc50J0nD9h/vBt
+    DRaeP+A1xxHUnp8/6951JzaDoD9zPwoKJiahPxcrqZFJt6E/pobcBh80oj+0jQWJVpmiPx/AShMJ
+    4qI/zKAvvfkEoz8UrDkcrfKiP3yaZuHXeqI/V4KAuFuAoD8=
+eta: 0.8078217365599016
+inflow: !!python/object/apply:numpy.core.multiarray._reconstruct
+  args:
+  - *id001
+  - !!python/tuple
+    - 0
+  - !!binary |
+    Yg==
+  state: !!python/tuple
+  - 1
+  - !!python/tuple
+    - 40
+  - !!python/object/apply:numpy.dtype
+    args:
+    - f8
+    - 0
+    - 1
+    state: !!python/tuple
+    - 3
+    - <
+    - null
+    - null
+    - null
+    - -1
+    - -1
+    - 0
+  - false
+  - !!binary |
+    jMuUJs3l1j/2FIYR0lfXPx3Grsqxsdc/qebNyeb71z9xf8H6ETnYP5EB34kNadg/DiyBXL201z85
+    nIJuWOTXP1x9Uo5SFdg/QaWLBwFG2D/y0ohkhXnYP7N0KrsQrtg/m58JfdDb2D+VBLYM1gPZP381
+    445kJ9k/nQEla0NI2T9x4kp13GbZP1/weNc2g9k/70/9ma6d2T+sdAhWerbZP4enCRqwzdk/Kgvk
+    4GPj2T9DjP7i9fvZP25qntkQHto/D+qZONA+2j/+TvagcF7aP3zhjtJFfto/BjWCCVud2j9RcnjX
+    8bzaP97Hund+3do/2Flh30D/2j+IjrKrTCPbP2sqALrySts/ZC8SYvF32z8+WTYhB63bPxBZmyra
+    7ts/iB4LhnZG3D8yMxSYJMbcP5YQKs+7o90/YZeEYADr3z8=
+nb: 2
+nondimlspan: !!python/object/apply:numpy.core.multiarray._reconstruct
+  args:
+  - *id001
+  - !!python/tuple
+    - 0
+  - !!binary |
+    Yg==
+  state: !!python/tuple
+  - 1
+  - !!python/tuple
+    - 40
+  - !!python/object/apply:numpy.dtype
+    args:
+    - f8
+    - 0
+    - 1
+    state: !!python/tuple
+    - 3
+    - <
+    - null
+    - null
+    - null
+    - -1
+    - -1
+    - 0
+  - false
+  - !!binary |
+    exSuR+F6vD8fhetRuB7BPwAAAAAAAMQ/4noUrkfhxj/D9Shcj8LJP6RwPQrXo8w/hutRuB6Fzz80
+    MzMzMzPRP6RwPQrXo9I/Fa5H4XoU1D+G61G4HoXVP/YoXI/C9dY/aGZmZmZm2D/Yo3A9CtfZP0jh
+    ehSuR9s/uh6F61G43D8qXI/C9SjeP5qZmZmZmd8/hutRuB6F4D8+CtejcD3hP/YoXI/C9eE/r0fh
+    ehSu4j9nZmZmZmbjPx+F61G4HuQ/16NwPQrX5D+QwvUoXI/lP0jhehSuR+Y/AAAAAAAA5z+5HoXr
+    UbjnP3E9CtejcOg/KVyPwvUo6T/iehSuR+HpP5qZmZmZmeo/U7gehetR6z8L16NwPQrsP8P1KFyP
+    wuw/fBSuR+F67T80MzMzMzPuP+xRuB6F6+4/pXA9Ctej7z8=
+omega: 157.07963267948966
+power_watts: 245.10358045474294
+radius: 0.3
+rcout: 0.1
+solidity: 0.12
+th0: 38.935900044893785
+twist_deg: !!python/object/apply:numpy.core.multiarray._reconstruct
+  args:
+  - *id001
+  - !!python/tuple
+    - 0
+  - !!binary |
+    Yg==
+  state: !!python/tuple
+  - 1
+  - !!python/tuple
+    - 40
+  - !!python/object/apply:numpy.dtype
+    args:
+    - f8
+    - 0
+    - 1
+    state: !!python/tuple
+    - 3
+    - <
+    - null
+    - null
+    - null
+    - -1
+    - -1
+    - 0
+  - false
+  - !!binary |
+    mpmZmZnpMEDNzMzMzDwwQAAAAAAAIC9AZmZmZmbGLUDMzMzMzGwsQDMzMzMzEytAmZmZmZm5KUD/
+    /////18oQGZmZmZmBidAzMzMzMysJUAyMzMzM1MkQJmZmZmZ+SJA/v////+fIUBmZmZmZkYgQJiZ
+    mZmZ2R1AZGZmZmYmG0AyMzMzM3MYQAAAAAAAwBVAyszMzMwME0CYmZmZmVkQQMjMzMzMTAtAYGZm
+    ZmbmBUAAAAAAAEABQJCZmZmZGf0/MDMzMzOz9z/AzMzMzEzyP8DMzMzMzOk/AAAAAAAA3j+AzMzM
+    zMzAP4BmZmZmZsq/YGZmZmZm4b9AMzMzMzPsvwAAAAAAgPO/cGZmZmbm+L/QzMzMzEz+v6CZmZmZ
+    2QHA0MzMzMyMBMAAAAAAAEAHwDgzMzMz8wnAcGZmZmamDMA=

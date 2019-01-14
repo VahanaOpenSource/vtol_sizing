@@ -85,15 +85,15 @@ class battery_profile:
 
       plt.figure(1)
       plt.subplot(211)
-      plt.title('Perfect battery assumptions')
+      plt.title('\\textbf{Perfect battery assumptions}')
       plt.ylim([0,100])
-      plt.xlabel('Mission time (min)')
-      plt.ylabel('Battery charge (\%)')
+      plt.xlabel('\\textbf{Mission time (min)}')
+      plt.ylabel('\\textbf{Battery charge (\%)}')
       plt.subplot(212)
-      plt.title('Vahana battery assumptions')
+      plt.title('\\textbf{Vahana battery assumptions}')
       plt.ylim([0,100])
-      plt.ylabel('Battery charge (\%)')
-      plt.xlabel('Mission time (min)')
+      plt.ylabel('\\textbf{Battery charge (\%)}')
+      plt.xlabel('\\textbf{Mission time (min)}')
       plt.tight_layout(pad=1)
 
 #====================================================================
@@ -138,13 +138,15 @@ class battery_profile:
          dt             = deltaEnergy/reserve_pow*60        # additional reserve time 
          d              = dt*reserve_V*60/1000              # extra reserve distance
          # print('extra time is ',dt,reserve_V,d);quit()
-
+      else:
+         print('warning: energy used is ',round(E_used,0), '% available is ', b['rated_capacity'], ' kWh')
 #====================================================================
 # set x limits on plot
 #====================================================================
       
       # print(time[-1]+1+dt)
       plt.subplot(211)
+      print(dt)
       plt.xlim([time[0], time[-1]+1+dt])
       plt.subplot(212)
       plt.xlim([time[0], time[-1]+1+dt])
@@ -176,14 +178,14 @@ class battery_profile:
             marker      = 'o'
 
             if(V != 0):
-               str1        = 'range = ' + str(round(dist,1)) + ' km'
+               str1        = '\\textbf{range = ' + str(round(dist,1)) + ' km}'
                # print('annotating at',x0,y0)
                plt.annotate(str1,xy=(x0,y0),xytext=(x0,y0),rotation=-trans_angle,color=lcolor)
          elif(typ == 'reserve'):
             lstyle      = ':'
             lcolor      = 'green'
             marker      = ''
-            str1        = str(round(reserve_d,0)) + ' km reserve'
+            str1        = '\\textbf{\\qquad' + str(round(reserve_d,0)) + ' km reserve}'
             x0          = time[i]
             y0          = Estatus[i]+2
             l2          = numpy.asarray([x0,y0])
@@ -242,7 +244,7 @@ class battery_profile:
          delE           = Estatus[i+1] - Estatus[i]
          if(typ == 'reserve'):
             reserve_d   = reserve_V*1.853*5.0/18.0*t*60*0.001        # in km
-            str1        = 'range = ' + str(round(dist,1)) + ' km'
+            str1        = '\\textbf{range = ' + str(round(dist,1)) + ' km}'
             # print(time[i],t,Estatus[i],delE)
 
             slope       = numpy.arctan2(dE[i],t)*180.0/numpy.pi 

@@ -3,8 +3,8 @@ Sizing:
       All_rotors:
          radius:        [1.0]              # in meters for radius, lb/sq.ft for DL
          Nb:            [3]                # per rotor
-         Vtip:          [180]              # hover tip speed, m/s
-         solidity:      [0.11]             # rotor geometric solidity 
+         Vtip:          [170]              # hover tip speed, m/s
+         solidity:      [0.135]             # rotor geometric solidity 
 
    Wings:
       Main:
@@ -55,7 +55,7 @@ Aircraft:
    mass_payload:      250.0
    mass_crew:         0
    avionics:         79.2
-   common_equipment: 24.0        # HVAC systems - common for all PAX
+   common_equipment: 106.3       # 24 kg furnishing + 82.3 kg margin
    common_per_pax:    0.0
    pax_count:         0          # number of passengers (uses pax -> baggage map)
 

@@ -4,7 +4,7 @@
 
 class costs:
 
-   def __init__(self, data, acq_data, beta_fac, duration, nrotors):
+   def __init__(self, data, acq_data, beta_fac, mission, nrotors, npax):
 
 #====================================================================
 # memory initialization for group totals and breakdown
@@ -21,14 +21,17 @@ class costs:
 # input parameters
 #====================================================================
 
-      self.tmission                 = duration/60.0               # mission duration in hours
+      self.tmission                 = mission.cost_duration/60.0  # mission duration in hours
+      self.dmission                 = mission.cost_range          # range in km 
       self.Annual                   = data.Annual                 #
-      self.Battery                  = data.Battery 
       self.Hourly                   = data.Hourly
+      self.Battery                  = data.Battery 
+      self.Taxi                     = data.Taxi 
+      self.Vertiport                = data.Vertiport
       self.Acquisition              = acq_data 
       self.beta_fac                 = beta_fac 
       self.nrotors                  = nrotors 
-
+      self.npax                     = npax 
       return None
 
 #====================================================================
@@ -56,6 +59,7 @@ class costs:
 # final assembly, testing and BRS costs scale with weight
 #====================================================================
 
+#      print(total_empty_mass)
       cost['final_assem_line'] = scaling['final_assem_line']*total_empty_mass
       cost['BRS']              = scaling['BRS']             *massTakeoff   # Ballistic recovery system 
 
@@ -132,6 +136,51 @@ class costs:
       cost['rotor_hub']       = hub_costs
       return None 
 
+#=============================================================================
+# calculate costs for ground-only travel
+#=============================================================================
+
+   def taxi_analysis(self):
+      speed                = self.taxi_speed(self.dmission)          # km/hr output, km input
+      self.Taxi_time       = self.dmission/speed*60.0                # time in minutes
+      self.taxi_cost       = self.Taxi.Distance_rate*self.dmission   # taxi cost in USD
+
+      self.taxi_cost       = self.taxi_cost + self.Taxi_time*self.Taxi.Time_rate # add extra due to time rate
+
+      self.Taxi_time       = self.Taxi_time + self.Taxi.Padding_time
+
+#====================================================================
+# for UAM: last leg distance: 2 km
+#====================================================================
+
+      distance                   = self.Vertiport.Ground_distance    # km for last leg
+      speed                      = self.taxi_speed(distance)         # km/hr for last leg
+      time                       = distance/speed                    # hours spent for last leg      
+      taxi_cost                  = distance*self.Taxi.Distance_rate + \
+                                       time*self.Taxi.Time_rate*60
+
+      self.UAM_cost              = self.variable_costs*self.tmission + \
+                                   taxi_cost 
+
+      self.UAM_time              = (time + self.tmission)*60 + \
+                                   self.Vertiport.Padding_time       # total time
+
+      self.dollar_per_min  = (self.UAM_cost - self.taxi_cost)/(self.Taxi_time - self.UAM_time)
+      if(self.npax > 0):
+         self.dollar_per_min  = self.dollar_per_min/self.npax 
+
+      return None 
+
+#=============================================================================
+# function to calculate average speed of a taxi in downtown areas
+# input: distance in km, 
+# output: speed in km/hr
+#=============================================================================
+
+   def taxi_speed(self, distance):
+      speed             = 16.6*distance/(15.0+distance)*3.6   # ground speed, kmph
+      return speed 
+
 #====================================================================
 # Fixed costs: insurance, depreciation, liability, yearly inspections
 #====================================================================
@@ -193,9 +242,16 @@ class costs:
 # assume batteries go through one charge/discharge cycle per flight
 #====================================================================
 
-      cycles_per_hour            = 1.0/self.tmission              # tmission in hours
+      flights_per_hour           = 1.0/self.tmission              # tmission is in hours
+      cycles_per_hour            = flights_per_hour               # one cycle of charge/discharge per flight
       Flight_hours               = int(Ncycles/cycles_per_hour)   # flight hours that battery lasts for
-      var['battery_use']         = rate_b*Etotal/(Flight_hours)          # battery operating cost, $/flight hour 
+      var['battery_use']         = rate_b*Etotal/(Flight_hours)   # battery operating cost, $/flight hour 
+
+#====================================================================
+# landing fees
+#====================================================================
+
+      var['landing_fees']        = self.Vertiport.Landing_fees*flights_per_hour
 
       return None
 
@@ -239,9 +295,9 @@ class costs:
 # get variable cost components 
 #=============================================================================
 
-#      print(Emission)
       self.calc_variable_costs(Emission, Etotal)                        # component build up
       self.variable_costs     = dict_accumulation(self.var_breakdown)   # depends on mission
+      self.taxi_analysis()
 
 #=============================================================================
 # add up key value entries and return total 

@@ -46,8 +46,11 @@ def fuselage_v2(vehicle_parameters):
   fac        = vehicle_parameters['tech_factors'].fuselage
   wing       = vehicle_parameters['wing']
   l_fus      = vehicle_parameters['l_fus']       # ft 
-  h_fus      = vehicle_parameters['b_fus']       # ft 
-  b_fus      = h_fus                             # ft 
+
+#====================================================================
+# number of rotors on the wing: decides weight fraction carried in 
+# keel beam and peak bending/rolling moment
+#====================================================================
 
 #====================================================================
 # get max span for all wing groups
@@ -61,11 +64,11 @@ def fuselage_v2(vehicle_parameters):
 # GB/ZL fuselage model
 #====================================================================
    
-  length  = span*0.5
+  length  = l_fus
 #  length  = l_fus*0.3048             # fuselage length in meters
 #  width   = b_fus*0.3048             # width of fuselage in meters
 #  height  = b_fus*0.3048             # height in meters
-  weight  = gtow/2.2*9.81            # vehicle weight in Newtons
+  weight  = gtow/2.2*9.81             # vehicle weight in Newtons
 
   width   = 1.55
   height  = 1.55
@@ -81,7 +84,7 @@ def fuselage_v2(vehicle_parameters):
 # Bulkhead Mass
 #====================================================================
   
-  bulkheadMass = 4*pi*height*width/4*arealWeight
+  bulkheadMass = 4*(pi*height*width*0.25)*arealWeight
 
 #====================================================================
 # Canopy Mass
@@ -90,23 +93,35 @@ def fuselage_v2(vehicle_parameters):
   canopyMass = Swet/10*canopy_thk*canopy_rho
 
 #====================================================================
+# find wing lift fraction (minimum)
+#====================================================================
+
+  min_lf     = 5.0
+  for i in range(wing.ngroups):
+    group     = wing.groups[i]
+    min_lf    = min(min_lf, group.lift_frac/group.nwings)
+
+#  print(min_lf)
+#====================================================================
 # Keel Mass due to lift
 #====================================================================
 
-  L           = ng*weight*sf        # Lift
-  M           = L/4*length*2/3      # Peak moment from tail lift
-  beamWidth   = width/1.4142        # Keel width
-  beamHeight  = height/1.4142       # Keel height
-  A           = M*beamHeight/(4*uni_stress*(beamHeight/2)**2)
+  L           = ng*weight*sf          # Total limit lift, Newtons
+  M           = L*min_lf*length*(2/3) # Peak moment from tail lift
+  ratio       = 1.0
+  ratio2      = 1.0
+  beamWidth   = width/ratio          # Keel width, meters
+  beamHeight  = height/ratio2        # Keel height, meters
+  A           = M*beamHeight/(4*uni_stress*(beamHeight*0.5)**2)
   massKeel    = A*length*uni_rho
-  
+
 #====================================================================
 #Keel Mass due to torsion
 #====================================================================
 
-  M           = 0.25*L*span/2       #Wing torsion 
+  M           = min_lf*L*span*0.75     # Wing torsion 
   A           = beamHeight*beamWidth
-  t           = 0.5*M/(bid_shear*A)
+  t           = 0.5*M/(bid_shear*A)*(ng*0.5)
   massKeel    = massKeel+2*(beamHeight+beamWidth)*t*bid_rho
 
 #====================================================================

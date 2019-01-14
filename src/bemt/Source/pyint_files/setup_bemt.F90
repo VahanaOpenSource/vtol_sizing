@@ -49,6 +49,7 @@ subroutine setup_bemt()
         write(6,*) 'running BEMT analysis in fixed RPM, variable collective mode'
         write(6,*) 'evaluating performance of best design'
         call evaluate_design(inputs, flt, best_design, Rotor, design_vars, .true.)
+        best_rotor  = Rotor
         return 
     elseif(Inputs % mode_operation == 2) then 
         write(6,*) 

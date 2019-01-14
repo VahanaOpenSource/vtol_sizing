@@ -1,0 +1,56 @@
+\section{\textbf{Analysis Organization}}
+
+\hydra \spc is a rotorcraft sizing code with the following features:
+\begin{enumerate}
+\item \textbf{Sizing}: obtain consistent vehicle weights and performance for a given payload and mission profile.
+\item \textbf{Optimization} Optimize a given design (e.g., for annual operating cost) 
+\item \textbf{Sensitivity Analysis} For a given design, identify sensitivity of weights and performance metrics to (i) underlying assumptions (e.g., engine efficiency), and (ii) changing design variables (e.g., rotor tip speed)
+\end{enumerate}
+
+The main focus of this document is to explain the usage of the analysis, and implementation of the various performance, weight and cost models used to size the rotorcraft. The theory, if any, will be explained side-by-side with the corresponding code segment. 
+
+\subsection{\textbf{Programming Language and Syntax}}
+\hydra \spc is written in \ty{Python3}, with heavy emphasis on classes to contain and compartmentalize information. Because \ty{Python2} support expires in 2019, it is recommended to use \ty{Python3} specifically.
+
+Some parts of the code are written in \ty{Fortran}. Three fortran compilers have been tested and verified to work with the compiled parts of the code: GNU fortran, intel fortran and PGI fortran. Among these three compilers, \ty{gfortran} and \ty{pgfortran} are free, while \ty{ifort} requires academic or commercial licenses. The main advantage of \ty{pgfortran} is the availability of support for \ty{CUDA-Fortran}, while executables generated with \ty{ifort} consistently run faster than those generated with \ty{gfortran} or \ty{pgfortran} for the target applications. 
+
+\hydra \spc also features a built-in Blade Element Momentum Theory (BEMT) solver, also implemented in \ty{Fortran90}. The BEMT solver is parallelized with \ty{OpenMP}. Additionally, the sizing and optimization stages of \hydra \spc are parallelized with \ty{MPI}, and can be executed in parallel.
+
+\subsection{\textbf{Pre-Requisites and Installation Notes}}
+A \textbf{Fortran90 compiler} is required. Due to the use of free-format coding, derived types and modules, \emph{a Fortran77 compiler is not sufficient}. 
+
+If you want to try running the code on Windows, there are some manual steps required to help certain Python modules recognize the OpenMP libraries. For the time being, consult Ananth for installation details on Windows. 
+
+Additional \textbf{Python3} and its modules (freely available) are required to run HYDRA and its various postprocessors:
+\begin{enumerate}
+	\item \textbf{matplotlib, numpy, scipy, pyyaml, python3-tk, f90wrap}
+	\item Optional: mpi4py
+\end{enumerate}
+
+Finally, \textbf{CMake} version 3.0 or higher is required to create Platform-independent Makefiles that compile the Fortran90 routines. To use integrated \LaTeX rendering for fonts in plots, you may also need the \textbf{texlive-fonts-extra} package.
+
+\subsection{\textbf{Source Code Directories}}
+All source code to be compiled is located in \textbf{src/}, under various subfolders. Each subfolder contains a collection of subroutines or functions that pertain to specific types of operations. 
+
+\subsubsection{\textbf{Python code: src/Python}}
+This subfolder contains various classes and functions written in Python that pertain to sizing a vehicle, in four sub-folders.
+\begin{enumerate}
+      \item \textbf{Stage\_0/}: This folder contains the ``main'' class that defines the vehicle in \textbf{hydraInterface.py}. It contains the various high-level driver functions pertaining to sizing and optimization. The folder also contains two other files, \textbf{dict2obj.py} (convert dictionary to class) and \textbf{footprint.py} (calculates vehicle footprint).
+      \item \textbf{Stage\_1/}: This folder contains the workhorse routines that perform sizing with weight, performance and cost estimation.
+      \item \textbf{Stage\_3/}: This folder contains Python-wrapped routines for higher-fidelity fuselage and wing weight models, BEMT rotor performance models and the associated interfaces to setup the inputs and extract outputs for the sizing analysis.  
+      \item \textbf{Postprocessing/}: This folder contains functions that perform postprocessing analysis, including optimization, design perturbation and sensitivity studies, noise estimation, battery status, profile, power curve, and pie charts for the breakdown of vehicle weight, operating cost and parasitic drag. 
+\end{enumerate}
+
+\subsubsection{\textbf{NETLIB FILES: Source/fea/Source/mathops/}}
+ This subfolder contains the ODE Solver \ty{dassl}, algebraic equation solver \ty{hybrd} and various dependencies needed for linear algebra and matrix operations. These files have not be modified, except the algebraic equation solver \ty{hybrd.f}. This file alone has been changed to obtain the Jacobian in parallel using OpenMP.
+ 
+Parts of the sizing analyis, FEA-based fuselage/wing weight estimation and BEMT-based rotor performance estimation are written in Fortran90 to improve execution speed. The source code for these operations are contained in \textbf{src/bemt/Source/}, \textbf{src/fea/Source/} and \textbf{src/sizing/Source/}. Within each of these folders, there are three sub-folders: 
+
+\subsubsection{\textbf{Python-integrated routines: Source/pyint\_files/}}
+This subfolder contains routines that can be invoked from Python, using \ty{f2py} and James Kermode's \ty{f90wrap} adaptation for derived types.
+
+\subsubsection{\textbf{Python-accesible modules: Source/pyint\_modules/}}
+The files in this folder contain module definitions used to define universal constants (e.g., 1, 0, $\pi$) to the required precision. Using James Kermode's \ty{f2py-f90wrap} interface generator, \python \spc can access and modify these module variables directly without having to painstakingly break down derived types into its primitive constituents (arrays, integers, real numbers and logicals). The advantage of this automation and abstraction helps avoid programming errors, reduces the number of arguments passed between \ty{Python} and \ty{Fortran} and allows for code feature expansion without significant additional effort.
+
+\subsubsection{\textbf{Python-invisible files: Source/pyinv\_files/}}
+The files in this folder are work-horse routines that can be called only by the routines in \textbf{Source/pyint\_files/}, but not directly by \python. These routines, together with those in Source/pyint\_files/, are compiled into shared object files. Specific routines (present in Source/pyint\_files/) in these shared objects can be called by the \python \spc interface.

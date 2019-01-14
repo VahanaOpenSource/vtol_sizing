@@ -1,40 +1,31 @@
 # ===================================================================
-# Driver file for hydra sizing
-#
-# Bharath Govindarajan, Ananth Sridharan
-# ===================================================================
-
-print ''
-print '     _  _    _  _    ____    ____     __  '
-print '    / )( \  ( \/ )  (    \  (  _ \   /__\ '
-print '    ) __ (   )  /    ) D (   )   /  /    \\'
-print '    \_)(_/  (__/    (____/  (__\_)  \_/\_/'
-print ''
-
-print ''
-print ' -------------------------------------------'
-print ' Check input.yaml and set directory paths'
-print ' -------------------------------------------'
-print ''
-
-# ===================================================================
 # Import built-in modules
 # ===================================================================
 
-import os, sys, time, shutil
+from __future__ import print_function
+import os, sys, time, shutil, numpy
 import copy
 import itertools
 import yaml
 import matplotlib.pyplot as plt
 
-sys.dont_write_bytecode=True
+from mpi4py import MPI 
+comm      = MPI.COMM_WORLD
+rank      = comm.Get_rank()
+nprocs    = comm.Get_size()
+
+# ===================================================================
+# Driver file for hydra sizing
+#
+# Bharath Govindarajan, Ananth Sridharan
+# ===================================================================
+
+#sys.dont_write_bytecode=True
 
 # ===================================================================
 # Set path and import routines
 # ===================================================================
 
-#path_loc = os.path.normpath(os.path.join(here,'../Postprocessing'))
-#sys.path.insert(0,path_loc)
 sys.path.append('../../src/Python/Stage_0')
 sys.path.append('../../src/Python/Stage_1')
 sys.path.append('../../src/Python/Stage_1/afdd')
@@ -49,46 +40,66 @@ from hydraInterface    import hydraInterface
 # ===================================================================
 
 log_dir   = './output/logs/'
-try:
-  shutil.rmtree(log_dir)
-except:
-  pass
+if(rank == 0):
+  try:
+    shutil.rmtree(log_dir)
+  except:
+    pass
+  os.makedirs(log_dir)
 
-os.makedirs(log_dir)
-
-# ===================================================================
-# parse through the inputs and create the subset data structures
-# ===================================================================
+comm.Barrier()
 
 # ===================================================================
-# load default file
+# load empirical parameters and inputs
 # ===================================================================
 
 with open("defaults.yaml","r") as f:
    fdefault = yaml.load(f)
 
-# ===================================================================
-# update with user-defined sizing file
-# ===================================================================
-
 with open("input.yaml","r") as f:
    fyaml = yaml.load(f)
 
-fyaml['Sizing']   . update(fdefault['Sizing'])
-fyaml['Aircraft'] . update(fdefault['Aircraft'])
+# ===================================================================
+# Get super-dictionary
+# ===================================================================
+
+fyaml['Sizing']. update(fdefault['Sizing'])
 
 sizing_dict      = fyaml['Sizing']
 mission_dict     = fyaml['Mission']
 aircraft_dict    = fyaml['Aircraft']
-paths_dict       = fyaml['Paths']
-
 empirical_dict   = fdefault['Empirical']
 
-all_dict = { 'paths'     : paths_dict,     \
-             'empirical' : empirical_dict, \
-             'mission'   : mission_dict,   \
-             'aircraft'  : aircraft_dict,  \
-             'sizing'    : sizing_dict }
+try:
+  configuration  = fyaml['Configuration']
+except:
+  configuration  = {}
+
+try:
+  ops_dict       = fdefault['Operations']
+except:
+  ops_dict       = {}
+
+try:
+  acq_dict       = fdefault['Acquisition']
+except:
+  acq_dict       = {}
+
+try:
+  redund         = fdefault['Redundancies']
+except:
+  redund         = {}
+
+#beta_factors     = fdefault['Beta_factors']
+
+all_dict = { 'empirical' : empirical_dict,  \
+             'mission'   : mission_dict,    \
+             'aircraft'  : aircraft_dict,   \
+             'sizing'    : sizing_dict,     \
+             'operations': ops_dict,        \
+             'purchase'  : acq_dict,        \
+             'redund'    : redund,          \
+             'config'    : configuration}
 
 # ===================================================================
 # create instance of hydraInterface class
@@ -106,40 +117,32 @@ all_combinations, ncases = x.setupLoops()
 # loop through all possible combinations
 # ===================================================================
 
-t1 =  time.time()
+valid_count     = 0
+t1              =  time.time()
 for icom,com in enumerate(all_combinations):
    
 # ===================================================================
 # print statement is continued
 # ===================================================================
 
-   print ("\n - Case: %7d of %7d ..... " %(icom+1,ncases)),
-
 # ===================================================================
 #  'case' dictionaries adjusted here for next design
 # ===================================================================
 
-   x.modifyCase(com)
+  if(rank == com['rank']):
 
 # ===================================================================
 # run the case and save data to file 
 # ===================================================================
 
-   x.setAndRun(com)
-
-# ===================================================================
-# write out log file
-# ===================================================================
-   
-   x.writeLogData(icom, x.getEmptyWeightGroup() )
-
-#perf=extract_performance('./output/log.yaml')
-#perf.power_curve()
-#perf.energy_consumption()
-#perf.hover_endurance()
-#perf.cruise_performance()
-#
-#plt.show()
+    x.modify_case(com)
+    x.run_hydra()
+    x.write_summary(com)
+    print ("\n - Rank %3d, Case: %7d of %7d ..... " %(com['rank'],icom,ncases-1),x.errmsg)
+    if x.valid:
+      x.writeLogData(icom)
+      valid_count     = valid_count + 1
+      x.errmsg        = x.errmsg + 'valid design!'
 
 # ===================================================================
 # final wrap-up for program termination
@@ -149,9 +152,28 @@ for icom,com in enumerate(all_combinations):
 # print message to screen with diagnostics
 # ===================================================================
 
-print 'number of valid designs are ',x.valid_count
+comm.Barrier()
 t2 =  time.time()
-print 'time taken is ',t2-t1
+if(rank == 0):
+  print ('\n Computation time taken is %6.4f seconds' %(t2-t1))
+
+print ('process # ',rank,': number of valid designs are ',valid_count)
+
+#====================================================================
+# loop through all output files: do with processor rank 0
+#====================================================================
+
+if(rank == 0 and nprocs > 1):
+  with open(x.fname,'a') as f:
+      for i in range(1,nprocs):
+#          print('getting data from processor rank # ',i)
+          fname   = 'summary_p' + str(i) + '.dat'
+          with open(fname,'r') as origin:
+            for line in origin:
+                f.write(line)
+          os.remove(fname)
+  t3        = time.time()
+  print ('File reconstruction time taken is ',t3-t2,'seconds')
 
 # ===================================================================
 # deallocate memory and terminate program

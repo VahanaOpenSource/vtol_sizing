@@ -6,10 +6,13 @@
 import os,sys
 import numpy as np 
 
-from mpi4py import MPI 
-comm  = MPI.COMM_WORLD
-rank  = comm.Get_rank()
-
+try:
+   from mpi4py import MPI 
+   comm  = MPI.COMM_WORLD
+   rank  = comm.Get_rank()
+except:
+   rank  = 0
+   
 from data_processing   import run_read
 class _loops: 
 
@@ -48,7 +51,9 @@ class _loops:
             else:
                print ('%20s \t | \t %s' % (key, str(value)))
          print( '==================================================')
-      comm.Barrier()
+      
+      if(self.MPI_found):
+         comm.Barrier()
 
 #=======================================================================
 # Extract entries and add to a list of lists
@@ -61,21 +66,22 @@ class _loops:
 #find # wing groups. Members within a group are identical   
 #=======================================================================
 
+      if 'wings' in sizing_dict:
 #loop over wing groups, find design parameters
-      Wings       = sizing_dict['wings']
-      for igroup in range(self.wing.ngroups):
-         grp            = self.wing.groups[igroup]
-         key            = grp.key            # how to access this object through dict addressing
-         svars          = Wings[key]
-         st             = 'Wing_group' + str(igroup)
-         for key,value in svars.items():
+         Wings       = sizing_dict['wings']
+         for igroup in range(self.wing.ngroups):
+            grp            = self.wing.groups[igroup]
+            key            = grp.key            # how to access this object through dict addressing
+            svars          = Wings[key]
+            st             = 'Wing_group' + str(igroup)
+            for key,value in svars.items():
 
 #=======================================================================
 #loop over design parameters that are not rotor-related
 #=======================================================================
 
-            st1         = st.lower() + '_' + key 
-            all_lists[st1] = value
+               st1         = st.lower() + '_' + key 
+               all_lists[st1] = value
 
 #=======================================================================
 # Rotor design variables
@@ -209,8 +215,9 @@ class _loops:
       aircraft_dict['wing']         = {}
       aircraft_dict['rotor']        = {}
 
-      for i in range(self.wing.ngroups):
-         aircraft_dict['wing']['group'+str(i)]          = {} 
+      if(bool(self.wing)):
+         for i in range(self.wing.ngroups):
+            aircraft_dict['wing']['group'+str(i)]          = {} 
 
       for key,lst in com.items():
          if key.startswith('wing_'):

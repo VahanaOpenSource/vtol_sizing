@@ -13,7 +13,7 @@ subroutine converge_inflow(flt , Rotor, Thrust, Power, converged)
 ! inputs
 !===========================================================================
 
-    type(rotor_def)  , intent(in)      :: Rotor
+    type(rotor_def)  , intent(inout)   :: Rotor
     type(flt_def)    , intent(in)      :: flt 
 
 !===========================================================================
@@ -187,6 +187,8 @@ subroutine converge_inflow(flt , Rotor, Thrust, Power, converged)
                 alpha       = (pitch(k) - phi)
                 adeg        = alpha*r2d 
 
+                Rotor % alpha(k)    = adeg 
+
 !===========================================================================
 ! Find Cl, Cd from tables
 !===========================================================================
@@ -227,6 +229,10 @@ subroutine converge_inflow(flt , Rotor, Thrust, Power, converged)
                 lam_new(k) = lamc + lami(k)
                 dlam       = lam_new(k) - lam(k)
                 lam(k)     = lam(k) + relax2*dlam
+
+                Rotor % inflow(k)   = lam(k)
+
+
                 all_err(k) = abs(dlam)
 
             end if 
@@ -251,6 +257,9 @@ subroutine converge_inflow(flt , Rotor, Thrust, Power, converged)
 
         Thrust  = Thrust + half * sigma(k) * temp * Cfz(k) * dr
         Power   = Power  + half * sigma(k) * temp * Cfx(k) * dr * Rotor % r(k)
+
+        Rotor % dCTdr(k) = half * sigma(k) * temp * Cfz(k)
+        Rotor % dCPdr(k) = half * sigma(k) * temp * Cfx(k) * Rotor % r(k)
 
     end do 
     

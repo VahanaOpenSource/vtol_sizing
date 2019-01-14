@@ -84,9 +84,9 @@ def noise(filename):
 # get ratio of hover to cruise RPM
 #====================================================================
 
-   rotor        = design.rotor
+   rotor        = design.rotor.groups[0]
    R            = rotor.radius
-   Omega_ratio  = design.all_dict['aircraft']['cruise_rpm_ratio']
+   Omega_ratio  = rotor.RPM_ratio
 
 #====================================================================
 # Generate rotor layout
@@ -173,7 +173,7 @@ def noise(filename):
 #====================================================================
 
    Sh, thetah,obs,hubs = observer_posn(x,y,z,alpha_s_h,l_shaft,altitude,R)
-   noise_h             = noise_footprint(Sh, thetah, design.rotor, obs)
+   noise_h             = noise_footprint(Sh, thetah, rotor, obs)
 
 #====================================================================
 # draw rotor discs in space and noise levels too
@@ -410,7 +410,8 @@ def noise_footprint(S_all, theta_all, rotor, obs):
       for ir in range(nr):
         S           =     S_all[i,j,ir]
         theta       = theta_all[i,j,ir]
-        dnoise[ir]  = rotor.fanNoise(S,theta)
+        # print(rotor.__dict__)
+        dnoise[ir]  = rotor.fanNoise(S,theta,rotor.sizing_thrust)
         noise[i,j]  = noise[i,j] + (10**(dnoise[ir]*0.1))
         # print(i,j,S,theta,dnoise[ir])
         # x1=input('ok?')

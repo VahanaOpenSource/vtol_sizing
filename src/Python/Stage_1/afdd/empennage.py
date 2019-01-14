@@ -26,13 +26,14 @@ def empennage_weight(wing, tech_factors):
        max_chord = max(max_chord,group.chord)
 
 #====================================================================
-# Vtail properties: AR=1
+# Vtail properties
 #====================================================================
 
+    chord        = max_chord*0.75
     rho_skin     = 1650.0   
-    span         = 2.5*max_chord
-    wght_vt      = skin_mass(max_chord, rho_skin, span)*2.2
-#    print(max_chord,wght_vt/max_chord/span);quit()
+    span         = 2.5*chord
+    wght_vt      = skin_mass(chord, rho_skin, span)*2.2
+
 #====================================================================
 # Empennage weights
 #====================================================================

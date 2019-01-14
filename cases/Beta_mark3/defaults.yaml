@@ -1,0 +1,156 @@
+# physical constraints
+Sizing:
+   Constraints:
+      max_rotor_radius:    14.1 # m
+      max_ct_sigma    :     0.14
+      max_gtow        :  5000.0 # kg
+
+#Empirical modeling parameters
+Empirical:
+# transmission
+   Transmission:
+      eta:              1.00     # line transmission efficiency
+
+#motor efficiencies
+   Motors:
+      All_motors:
+         hover_efficiency: 0.90
+         cruise_efficiency: 0.85
+
+#battery 
+   Battery: 
+      Cell:
+         sp_energy:   240.0      # measured in W-hr/kg
+         Tmax:         70.0      # max cell temperature, deg C
+         energy_vol:  632.0      # energy density, Watt-hours/liter
+         volume:        0.01708  # volume of a cell unit, liters
+      Pack:
+         SOH:           0.8      # state of health; 0 = gone; 1 = brand new
+         DOD_min:       0.075    # minimum depth of discharge; 0 = depleted, 0.1 = 10% energy remaining
+         integ_fac:     0.75     # battery pack integration factor for mass 
+         vol_fac:       0.3      # battery volume integration factor 
+      Force_sizing:     'energy' # don't worry about cell count or temperature effects      
+
+# engine 
+   Engines:
+      loss_filter:       0.00   # loss filter for engine - nothing for motor?
+      power_accs:        0.00   # accessories power - done with LV battery 
+      power_aux_equip:  00.00   # generator, fan, pumps..  (kW)
+      power_loss_mgb:    0.00   # percent loss
+      eff_hover_power:   1.00  # ratio of hover to cruise motor efficiencies
+      frac_install:      1.00   # installation losses
+   
+      KD_mrp: 1.0000          # lapse rate with altitude
+      KD_irp: 1.0000
+      KD_mcp: 1.0000
+
+      KT_mrp: 1.0000          # lapse rate with temperature
+      KT_irp: 1.0000
+      KT_mcp: 1.0000
+
+      fracPowerIdle: 0.1      # power margins
+      fracPowerIRP : 0.80     # power margin, intermediate condition
+      fracPowerMCP : 0.66     # how much of installed power fraction to use at continuous operation     
+
+# Aerodynamic parameters
+   Aerodynamics:
+
+# Rotor parameters
+      Rotors:
+         hover_dwld_factor:    0.015
+         cd0:                  0.012
+         induced_power_factor: 1.18
+         FM:                   0.75
+         kint:                 1.02
+
+# Wing parameters
+      Wings:
+         oswald:            0.8
+         cd0:               0.014
+
+# Propeller parameter
+      Propellers:
+         eta:               0.85
+
+      Body:
+         flat_plate_factor: 0.00       # means use drag build-up model
+
+# Geometry parameters
+   Geometry:
+      fuselage_width:    1.55          # fuselage width = 1 standard US car, 2.04m wide
+      clearance:         0.15          # clearance between two rotor discs, or disc/fuselage as fraction of radius
+
+# Empty weight: scaling factors for built-in equations to get sensitivity studies
+   Tech_factors:
+      Weight_scaling:
+         rotor:            1.0            # rotor blades
+         wing:             1.0            # wings
+         empennage:        1.0            # tail surfaces, if any (winglets for vahana config)
+         fuselage:         1.0            # 
+         landing_gear:     0.4            #  
+         fuel_system:      1.0            # 
+         drive_system:     1.0            #  
+         flight_control:   1.0            #  
+         anti_icing:       0.0            #  
+         powerplant:       0.76           # 
+         fuel:             1.0            # 
+         battery:          1.0            # 
+
+Acquisition:
+   Fixed_cost:
+      sense_avoid:         0.0            # USD => 
+      avionics:            0.0            # USD => from C.A, green
+      interiors:           0.0            # USD, air conditioning/heater/HUD
+      testing:             0.0            # USD => from C.T
+   Scaling_cost:
+      final_assem_line:   550.0           # USD/kg of take-off mass 
+      BRS:                  0.0           # USD/kg of take-off mass => from C.A, green 
+      fuselage:             0.0           # USD/kg of fuselage structural weight
+      landing_gear:         0.0           # USD/kg of landing gear strl.  weight
+      wing_structure:       0.0           # USD/kg of wing     structural weight
+      motors:               0.0           # USD/kg of drive motor mass 
+      power_dist:           0.0           # USD/kW of installed power
+      rotor_blade:          0.0           # USD/sq.m of plan-form area
+      rotor_hub:            0.0           # USD/unit of variable collective rotor hub+actuator
+      wires:                0.0           # USD/kg of wire weight => from C.A, red
+      tilt_actuator:        0.0           # USD/kg of tilt actuator weight => from C.A, blue
+      wing_flap:            0.0           # USD/kg of wing flap/aileron    => from C.A, blue
+   Beta_acq_factors:                      # acquisition cost multipliers for large-scale production
+      sense_avoid:         1.0            # USD => 
+      avionics:            1.0           # USD => from C.A, green
+      interiors:           1.0            # USD, air conditioning/heater/HUD
+      testing:             1.0            # USD => from C.T
+      final_assem_line:    1.0            # USD/kg of take-off mass 
+      BRS:                 1.0           # USD/kg of take-off mass => from C.A, green 
+      fuselage:            1.0            # USD/kg of fuselage structural weight
+      landing_gear:        1.0            # USD/kg of landing gear strl.  weight
+      wing_structure:      1.0            # USD/kg of wing     structural weight
+      motors:              1.0            # USD/kg of drive motor mass 
+      power_dist:          1.0           # USD/kW of installed power
+      rotor_blade:         1.0           # USD/sq.m of plan-form area
+      rotor_hub:           1.0           # USD/unit of variable collective rotor hub+actuator
+      wires:               1.0           # USD/kg of wire weight => from C.A, red
+      tilt_actuators:      1.0          # USD/kg of tilt actuator weight => from C.A, blue
+      wing_flaps:          1.0          # USD/kg of wing flap/aileron    => from C.A, blue
+
+Operations:
+   Annual:
+      Flight_hours:        1500              
+      Liability:           22000             # liability insurance, annual
+      Inspection:          7700
+      Insurance_percent:   4.5               # insurance cost, % of acquisition cost
+      Depreciation_percent: 10                # asset value loss per year, % of acquisition cost 
+   Hourly:
+      Frame_maintenance:     37.35           # $/hr 
+      Rotor_inspection:       1.0          # $/hr/rotor 
+      Motor_inspection:       0.625          # $/hr/rotor 
+   Battery: 
+      Cycles:               900
+      Cost_per_kwh:         187.5             # battery unit cost per unit energy capacity, $/kWh
+      Electricity:            0.15            # electricity cost per unit energy, $/kWh
+
+Redundancies:
+   wing_flap:              1.0 
+   tilt_actuator:          1.0
+   wires:                  1.0
+   avionics:               1.0

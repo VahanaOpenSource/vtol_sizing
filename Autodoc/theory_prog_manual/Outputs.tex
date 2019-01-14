@@ -1,0 +1,282 @@
+\section{Output files}
+This section of the documentation details the output file generated at the end of sizing. The file pattern is \textbf{log<XYZ>.yaml}, where <XYZ> is an integer representing a unique design ID number. The output is in plain text formatted as a YAML file, similar to the input files. These files can be read an automatically converted to \python \spc dictionaries using the \textbf{pyyaml} package. All outputs are stored under the \textbf{outputs/log/} subdirectory in the run folder.
+
+\subsection{\textbf{log<XYZ>.yaml}}
+An example output log file is detailed dictionary-by-dictionary below, and the relevant outputs are explained. 
+
+\subsubsection{\red{vehicle} summary}
+\begin{lstlisting}
+# ---------------------------------------------------
+# Mission and Vehicle Log
+# ---------------------------------------------------
+<@\red{vehicle:}@>
+   aircraftID:               2 
+   take_off_mass:            1734.67 # [kg]
+   power_installed:          963.0 # [kW]
+   Cruise_LbyD:              11.80 # 
+\end{lstlisting}
+The \red{vehicle} dictionary contains four high-level vehicle metrics. The \textbf{aircraftID} is an outdated output, that is a copy of the input value given in \textbf{input.yaml}. The other metrics given in this dictionary are the take-off mass in kg, sum of maximum rated motor power values in kiloWatts and the vehicle lift-to-drag ratio in the cruise sizing segment. 
+
+\subsubsection{\red{Rotor}}
+The \red{Rotor} dictionary provides details of the rotor geometry and performance in the hover sizing segment. Each sub-dictionary under the rotor dictionary corresponds to a unique rotor group. For each rotor group, the following outputs are specified:
+\begin{enumerate}
+\item \textbf{nrotor}: number of rotors of this type in the vehicle 
+\item \textbf{nblade}: number of blades per rotor in this rotor type 
+\item \textbf{disk\_loading}: rotor hover disk loading in pounds per square foot
+\item \textbf{aspect\_ratio}: blade aspect ratio (radius to chord ratio)
+\item \textbf{radius}: rotor radius in meters
+\item \textbf{chord}: mean rotor blade chord in meters 
+\item \textbf{tip\_speed}: rotor hover tip speed in m/s 
+\item \textbf{hover\_FM}: rotor figure of merit in the hover sizing segment 
+\item \textbf{cruise\_rpm\_ratio}: rotor cruise RPM divided by rotor hover RPM 
+\item \textbf{eta\_xmsn}: transmission efficiency, 0 to 1  
+\item \textbf{solidity}: rotor geometric solidity  
+\item \textbf{cd0}: rotor blade airfoil drag coefficient at zero lift
+\item \textbf{ipf}: rotor induced power factor in hover (non-ideal losses)
+\item \textbf{hvr\_dwld}: hover download divided by rotor lift share 
+\item \textbf{hvr\_ct\_sigma}: rotor blade loading in hover sizing segment 
+\item \textbf{prop\_eta}: prop-rotor efficiency in cruise sizing segment
+\end{enumerate}
+
+\begin{lstlisting}
+<@\red{Rotor:}@>
+   <@\blue{set0:}@>
+      nrotor:              8 
+      nblade:              3 
+      disk_loading:        16.76 # [lb/ft2]
+      aspect_ratio:        5.86 
+      radius:              0.93 # [m]
+      chord:               0.158 # [m]
+      tip_speed:           170.0 # [m/s]
+      hover_FM:            0.750 
+      cruise_rpm_ratio:    0.500 
+      eta_xmsn:            1.000 
+      solidity:            0.16299 
+      cd0:                 0.012 
+      ipf:                 1.234 
+      hvr_dwld:            0.015
+      hvr_ct_sigma:        0.139
+      prop_eta:            0.850
+\end{lstlisting}
+
+\subsubsection{\red{Wings}}
+This dictionary contains details of the wing geometry and operating condition in the cruise sizing segment. If multiple wing groups are present in the system, then details of each wing group are listed as sub-dictionaries. For each wing group, the following details are written:
+\begin{enumerate}
+\item \textbf{nwing}: the number of fixed wings of this type present in the vehicle.
+\item \textbf{span}: the tip-to-tip dimension in meters
+\item \textbf{chord}: the average wing chord in meters
+\item \textbf{structure\_wt}: the weight of the structure for one wing
+\item \textbf{wires\_wt}: the weight of wires running along one wing
+\item \textbf{aspect\_ratio}: the wing aspect ratio 
+\item \textbf{oswald}: the wing Oswald efficiency
+\item \textbf{cd0}: the wing profile drag coefficient
+\item \textbf{cl}: the operating lift coefficient for the cruise sizing segment
+\item \textbf{lift\_fraction}: lift fraction for this wing group in the cruise sizing segment 
+\item \textbf{rotors\_per\_wing}: the number of rotors mounted along a wing of this group
+\item \textbf{rotor\_group\_id}: the group identifier for rotors mounted on this wing
+\end{enumerate}
+\begin{lstlisting}
+<@\red{Wings:}@>
+   <@\blue{set0:}@>
+      nwing:               1 
+      span:                11.086 # [m]
+      chord:               2.217 # [m]
+      structure_wt:        117.303 # [kg, each] 
+      wires_wt:            66.506 # [kg, each] 
+      aspect_ratio:        5.000 
+      oswald:              0.800 
+      cd0:                 0.014 
+      cl:                  0.400 
+      lift_fraction:       0.900 
+      rotors_per_wing:       6 
+      rotor_group_id:        0
+   <@\blue{set1:}@>
+      nwing:               1 
+      span:                4.674 # [m]
+	 ... (pattern repeats)
+	 ...
+\end{lstlisting}
+
+\subsubsection{\red{Costs}}
+The \red{costs} dictionary contains a breakdown of the vehicle acquisition cost and operating cost per flight hour, as well as the results of comparisons with a ground taxi. The individual sub-dictionaries are detailed below.
+\paragraph{Acquisition cost breakdown}
+The first row \textbf{Frame\_acquisition} is the acquisition cost of the aircraft in millions of currency. The following dictionary shows two values per line: the first value is the cost of the component in currency, and the second column shows the fraction of the component's acquisition cost as a percentage of the total acquisition cost.
+\begin{lstlisting}
+<@\red{Costs:}@>
+   Frame_acquisition:   [0.779632] # [Millions of USD]
+   <@\blue{acquisition\_cost\_breakdown:}@>
+      BRS             : [      14161.395  ,  1.816] # [USD, % acquisition cost]
+      avionics        : [     109355.250  , 14.027] # [USD, % acquisition cost]
+      final_assem_line: [      42876.657  ,  5.500] # [USD, % acquisition cost]
+      fuselage        : [      47190.123  ,  6.053] # [USD, % acquisition cost]
+      interiors       : [      45152.000  ,  5.791] # [USD, % acquisition cost]
+      landing_gear    : [      20874.300  ,  2.677] # [USD, % acquisition cost]
+      motors          : [     117455.191  , 15.065] # [USD, % acquisition cost]
+      power_dist      : [      29854.461  ,  3.829] # [USD, % acquisition cost]
+      rotor_blade     : [      54432.887  ,  6.982] # [USD, % acquisition cost]
+      rotor_hub       : [      20923.226  ,  2.684] # [USD, % acquisition cost]
+      sense_avoid     : [      94908.500  , 12.174] # [USD, % acquisition cost]
+      testing         : [       6400.000  ,  0.821] # [USD, % acquisition cost]
+      tilt_actuators  : [      37893.206  ,  4.860] # [USD, % acquisition cost]
+      wing_flaps      : [      29202.352  ,  3.746] # [USD, % acquisition cost]
+      wing_structure  : [     106832.064  , 13.703] # [USD, % acquisition cost]
+      wires           : [       2120.209  ,  0.272] # [USD, % acquisition cost]
+\end{lstlisting}
+
+\paragraph{\blue{Annual operating costs}}
+This dictionary details the breakdown of annual operating costs for maintaining airworthiness. The field \textbf{Fixed\_operating\_costs} shows the aggregated annual costs in currency. The \blue{fixed cost breakdown} dictionary is organized in a manner similar to the previous section: the first column shows the cost in currency, and the second column shows the cost as a percentage of the annual cost. 
+
+\begin{lstlisting}
+   Fixed_operating_costs: [142746.614190] # [USD]
+   <@\blue{fixed\_cost\_breakdown:}@>
+      depreciation    : [      77963.182    , 54.616] # [USD, % fixed cost]
+      inspection      : [       7700.000    ,  5.394] # [USD, % fixed cost]
+      insurance       : [      35083.432    , 24.577] # [USD, % fixed cost]
+      liability       : [      22000.000    , 15.412] # [USD, % fixed cost]
+\end{lstlisting}
+
+\paragraph{\blue{Variable operating costs}}
+This section details the costs that depend on the number of flight hours that the vehicle is operated for. The field \textbf{Variable\_operating\_costs} details the currency spent per flight hour in operating costs due to maintenance, energy usage and inspections/cleaning. The variable operating costs are broken down into the individual cost elements in the \blue{variable\_cost\_breakdown} dictionary. The first number in the two-column rows is the cost in currency per flight hour, and the second number is the cost of that contributing element expressed as a percentage of the \textbf{Variable\_operating\_costs} field.
+
+\begin{lstlisting}
+   Variable_operating_costs: [290.210] # [USD/hr]
+   <@\blue{variable\_cost\_breakdown:}@>
+      battery_use     : [         51.327  , 17.686] # [USD/hr, % variable cost]
+      electricity     : [         31.895  , 10.990] # [USD/hr, % variable cost]
+      fixed_annual    : [         95.164  , 32.792] # [USD/hr, % variable cost]
+      frame_overhaul  : [         37.350  , 12.870] # [USD/hr, % variable cost]
+      landing_fees    : [         61.474  , 21.183] # [USD/hr, % variable cost]
+      vpf_overhaul    : [         13.000  ,  4.480] # [USD/hr, % variable cost]
+   UAM_time:            [         62.589] # [minutes    ]
+   Taxi_time:           [         80.261] # [minutes    ]
+   UAM_trip_cost:       [        101.662] # [USD        ]
+   Taxi_trip_cost:      [         50.994] # [USD        ]
+   Time_value:          [          2.867] # [$/min saved]
+\end{lstlisting}
+
+The last five fields are miscellaneous data that compare the performance and cost of an eVTOL with a ground taxi. \textbf{UAM\_time} is the time taken to travel from an airport gate to a vertiport, fly to another vertiport and finally travel the last leg by ground taxi (i.e., door-to-door time from airport to final destination through an ``air taxi''). The field \textbf{Taxi\_time} is the door-to-door time from airport to final destination using ground transport only. \textbf{UAM\_trip\_cost} is the total cost of operating a combined air taxi and ground taxi for the final leg, and the corresponding cost for the ground taxi-only option is \textbf{Taxi\_time\_cost}. The time value is defined as the price difference between the two transport options, divided by the time difference, or \textit{time value}.
+
+\subsubsection{\red{Weight breakdown}}
+This dictionary details the breakdown of vehicle weights. Three main weight categories are listed: \textbf{battery} (and/or \textbf{fuel}), \textbf{payload} and \blue{empty mass}. For rows with two columns, the first column is the component mass in kg, and the second column is the mass of the component expressed as a percentage of take-off mass. For rows with a single column, the number corresponds to a component's mass in kg.
+
+For the \blue{empty weight} dictionary, each components is listed under sub-dictionaries. If the empty weight group is a dictionary with additional breakdowns within the component, those details are also printed, along with a field called \textbf{total} - the accumulated mass of components within that group. These breakdowns are plotted in pie charts by the postprocessing script \textbf{piethon.py}.
+ 
+\begin{lstlisting}
+<@\red{Weights:}@>
+   <@\blue{empty\_weight:}@>
+      total:            [ 952.1         ,  54.9] # [kg, %GTOW]
+      alighting_gear  :
+         total        : [  60.5         ,   3.5] # [kg, % GTOW]
+         fairing      : [  26.0] # [kg]
+         structure    : [  34.5] # [kg]
+      avionics        : [  79.2         ,   4.6] # [kg, %GTOW]
+      common_equip    : [  24.0         ,   1.4] # [kg, %GTOW]
+      emergency_sys   : [  40.4         ,   2.3] # [kg, %GTOW]
+      empennage       :
+         total        : [  23.9         ,   1.4] # [kg, % GTOW]
+         vtail        : [  23.9] # [kg]
+      fuselage        :
+         total        : [  84.1         ,   4.8] # [kg, % GTOW]
+         bulkhead     : [  12.4] # [kg]
+         canopy       : [  12.2] # [kg]
+         keel         : [  14.9] # [kg]
+         skin         : [  44.6] # [kg]
+      powerplant      :
+         total        : [ 220.0         ,  12.7] # [kg, % GTOW]
+         motor_group0 : [ 220.0] # [kg]
+      rotor           :
+         total        : [ 143.6         ,   8.3] # [kg, % GTOW]
+         group0actuatr: [  26.9] # [kg]
+         group0blades : [  73.7] # [kg]
+         group0hub    : [  43.0] # [kg]
+      wing            :
+         total        : [ 171.9         ,   9.9] # [kg, % GTOW]
+         actuators    : [  14.9] # [kg]
+         mounts       : [  22.0] # [kg]
+         structure    : [ 117.4] # [kg]
+         tilters      : [  17.6] # [kg]
+      wires           :
+         total        : [ 104.4         ,   6.0] # [kg, % GTOW]
+         power_wire   : [  74.3] # [kg]
+         signal_wire  : [  30.1] # [kg]
+   battery:             [462.58         ,  26.7] # [kg]
+   payload:             [320.02         ,  18.4] # [kg]
+\end{lstlisting}
+
+\subsubsection{\red{Volumes}}
+The volume output section is under development, and additional fields will be introduced in future versions of \hydra. At present, the dictionary contains:
+\begin{lstlisting}
+<@\red{Volumes:}@>
+   fuselage_width:            1.00 # [m]
+   passenger_count:              0 # [people]
+   battery_volume:           0.439 # [cu.m]
+\end{lstlisting}
+This dictionary outputs the fuselage width (specified in \textbf{defaults.yaml}) in meters, number of passengers (specified in \textbf{input.yaml}) and the calculated battery volume in cubic meters. 
+
+\subsubsection{\red{Parasitic drag}}
+This dictionary details the vehicle flat plate area (\textbf{flat\_plate\_area}) in square meters. If the (\red{Empirical} $\rightarrow$ \blue{Aerodynamics} $\rightarrow$ \textbf{Body} $\rightarrow$ flat\_plate\_factor input in \textbf{defaults.yaml} is set to zero, the component drag build-up for the vehicle parasitic drag is also printed in a sub-dictionary, \blue{flat\_plate\_breakdown}. The entries in this sub-dictionary are the parasitic drag of each component expressed as a percentage of the total flat plate area. 
+\begin{lstlisting}
+<@\red{Parasitic\_drag:}@>
+   flat_plate_area:     0.422 # [sq.m] 
+   <@\blue{flat\_plate\_breakdown:}@> 
+      LG              : [ 41.0] # [%]
+      base            : [  7.0] # [%]
+      fus             : [ 18.9] # [%]
+      prot            : [  9.1] # [%]
+      spin            : [ 20.1] # [%]
+      vt              : [  3.8] # [%]
+\end{lstlisting}
+
+\subsubsection{\red{Mission details}}
+This dictionary provides relevant details for the vehicle performance during various mission segments. The field \textbf{total\_energy} is the energy in kWh required to complete the mission, which has \textbf{nsegments} segments. The segment types are given in the list \textbf{flight\_mode}, with the segment altitudes given in meters by the fields \textbf{start\_alt} and \textbf{end\_alt}. The variable \textbf{delta\_temp\_ISA} is the temperature offset at sea level for the sizing mission relative to the temperature in the International Standard Atmosphere model. The segment rate of climb is specified in feet per minute, while cruise speed is specified in knots. Segment duration is specified by the field \textbf{time}, and \textbf{rotor power required} for each segment is listed in kilowatts. The corresponding \textbf{battery power draw} is also listed in kW, and the battery \textbf{C-rating} is listed in 1/hr. The \textbf{cell temperature} (if the model is used in sizing) is shown at the end of each segment in deg C. Ambient \textbf{density} is specified in kg/cu.m. The vehicle mass at the beginning of each segment is listed in \textbf{segment\_mass}. The variable \textbf{segment\_type} is a character string; `all' indicates the segment is used for sizing and regular operations for operating cost evaluation; `reserve' indicates the segment is used for sizing only, but not for regular mission operating cost. The ground distance covered by the vehicle in kilometers is output in the field \textbf{segment\_distance}.
+\begin{lstlisting}
+<@\red{Mission:}@>
+   total_energy:        67.07 # [kW-hr]
+   nsegments:           4 
+   flight_mode:         ['hover   ','cruise  ','cruise  ','hover   '] 
+   start_alt:           [         0 ,         0 ,         0 ,         0 ] #[m]
+   end_alt:             [         0 ,         0 ,         0 ,         0 ] #[m]
+   delta_temp_ISA:      [      0.00 ,      0.00 ,      0.00 ,      0.00 ] #[C]
+   rate_of_climb:       [         0 ,         0 ,         0 ,         0] #[ft/min]
+   cruise_speed:        [      0.00 ,     98.00 ,     98.00 ,      0.00 ] #[knots]
+   time:                [      1.50 ,     16.53 ,      4.96 ,      1.50 ] #[min]
+   rotor_power_reqd:    [    486.76 ,    123.49 ,    123.49 ,    486.76 ] #[kW]
+   battery_power_draw:  [    540.84 ,    145.28 ,    145.28 ,    540.84 ] #[kW]
+   C-rating:            [      4.96 ,      1.33 ,      1.33 ,      4.96 ] #[1/hr]
+   cell temperature:    [      0.00 ,      0.00 ,      0.00 ,      0.00 ] #[deg C]
+   density:             [   1.226 ,     1.226 ,     1.226 ,     1.226] #[kg/cu.m]
+   segment_mass:        [    2000.9 ,    2000.9 ,    2000.9 ,    2000.9 ] #[kg]
+   segment_type:        ['all      ','all      ','reserve  ','all      ']
+   segment_distance:    [       0.00,      50.00,      15.00,       0.00]
+\end{lstlisting}
+
+\subsubsection{\red{Battery details}}
+This dictionary is used to output the details pertaining to the \red{battery}. The \textbf{rated\_capacity} is the rated energy in kWh of all vehicle battery packs. The \textbf{state\_of\_health} is the multiplier for the battery pack rated energy; the product of these two numbers is the maximum energy that the pack can store at the pack's end-of-life after several charge/discharge cycles. The parameter \textbf{depth\_discharge} is a fraction ranging from 0 to 1, which indicates the smallest energy fraction that the battery can be discharged to, without damaging the cells. In this example, the battery rated capacity before cycling is 109.07 kWh, and the design state of health is 0.8, i.e., at end of life, the maximum energy that can be stored in the battery is 0.8 $\times$ 109.07 = 87.25 kWh. The minimum depth of discharge is 0.075, i.e., the battery can be discharged until 0.075 $\times$ 109.07 = 8.18 kWh of energy is remaining, without permanently damaging the cells. 
+\begin{lstlisting}
+<@\red{Battery:}@>
+   rated_capacity:      109.07 
+   state_of_health:     0.800 
+   depth_discharge:     0.075 
+\end{lstlisting}
+\subsection{\textbf{log<XYZ>.txt}}
+The other output generated by \hydra \spc is the final converged design and its details stored as a \textbf{pickle} module. The various postprocessing scripts in \hydra \spc load the vehicle class in its converged state for various sensitivity studies and to extract details. To load the file corresponding to design ID = 0, use this template:\\
+\textbf{import pickle} \\
+\textbf{fname     = `outputs/log/log0.yaml'} \\
+\textbf{with open(fname,`rb') as f:} \\
+\textbf{$\textrm{          }$ $\textrm{    }$ design    = pickle.load(f)} \\
+The variable \textbf{design} is an instance of the \textbf{hydraInterface} class with all methods and variables required to perform sizing.
+
+\begin{landscape}
+\subsection{\textbf{summary.dat}}
+A high-level summary of all designs is provided in \textbf{summary.dat}. The first column is the unique design identifier; the second column is the take-off mass in kg, the third column is the installed power in kW, the fourth column is the mass sum of configuration fuel and battery (kg); the fifth column is the empty mass in kg; the sixth column is the payload mass in kg; the seventh column is the vehicle operating cost in currency per flight hour; the final column is an integer - 0 indicates the design is invalid, while 1 indicates the design satisfies all the constraints.
+\begin{lstlisting}
+  Design ID #      Weight (kg)     Power (kW)  Fuel/Batt (kg)   Empty Wt (kg)    Payload (kg) Op Cost ($/hr)   Valid design  
+              0    1734.67         963.05          462.579        952.07          320.02         290.21050          1       
+              1    1872.70         1171.23         525.369        1027.33         320.00         305.44722          1       
+              2    2049.93         1411.57         609.178        1120.75         320.00         325.62067          1       
+              3    1607.40         810.49          399.572        887.79          320.04         275.44891          1       
+              4    1702.75         967.71          441.230        941.50          320.02         285.65621          1       
+              5    1826.42         1143.83         497.869        1008.55         320.00         299.42785          1       
+ ... 
+\end{lstlisting}
+\end{landscape}

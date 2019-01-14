@@ -152,50 +152,49 @@ class _run_hydra:
 # propeller properties
 #====================================================================
 
-      Propellers        = empirical.Aerodynamics.Propellers 
-      prop.eta          = Propellers.eta 
-
+      try:
+         Propellers        = empirical.Aerodynamics.Propellers 
+         prop.eta          = Propellers.eta 
+      except:
+         pass 
+         
 #====================================================================
 # Wing operating condition and geometry
 #====================================================================
 
-#empirical parameters for wing
-      emp_wings         = empirical.Aerodynamics.Wings 
       emp_rotors        = empirical.Aerodynamics.Rotors
 
+#empirical parameters for wing
+      if(bool(self.wing)):
+         emp_wings         = empirical.Aerodynamics.Wings 
+   
 #from sizing inputs   
-      ngroups           = wing.ngroups
-      for i in range(ngroups):
-         k2             = 'group'+str(i)
-         Wing           = aircraft['wing'][k2]
-         w              = wing.groups[i]
+         ngroups           = wing.ngroups
+         for i in range(ngroups):
+            k2             = 'group'+str(i)
+            Wing           = aircraft['wing'][k2]
+            w              = wing.groups[i]
 
-         w.aspectratio  = Wing['aspectratio']
-         w.oswald       = emp_wings.oswald
+            w.aspectratio  = Wing['aspectratio']
 
-#====================================================================
-# calculate oswald efficiency factor if given as zero
-#====================================================================
+            w.oswald       = emp_wings.oswald
 
-         if w.oswald == 0.0:
-            w.oswald    = 1.0/(1.05 + 0.007*numpy.pi*Wing['aspectratio'])
-
-         w.cd0          = emp_wings.cd0
-         w.nwings       = Wing['nwing']
-         w.cl           = Wing['cl']
-         w.K            = 1.0/(numpy.pi*w.aspectratio*w.oswald)
+            w.cd0          = emp_wings.cd0
+            w.nwings       = Wing['nwing']
+            w.cl           = Wing['cl']
+#            w.K            = 1.0/(numpy.pi*w.aspectratio*w.oswald)
 
 #====================================================================
 # Loop over mission segments and set rotor aerodynamic efficiency defaults
 #====================================================================
 
-         for iseg in range(nseg):
-            segment     = mission.segment[iseg]
-            flightmode  = segment.flightmode
-            if(flightmode == 'hover'):
-               w.rotor_aero_eta[iseg]  = emp_rotors.FM
-            else:
-               w.rotor_aero_eta[iseg]  = prop.eta
+            for iseg in range(nseg):
+               segment     = mission.segment[iseg]
+               flightmode  = segment.flightmode
+               if(flightmode == 'hover'):
+                  w.rotor_aero_eta[iseg]  = emp_rotors.FM
+               else:
+                  w.rotor_aero_eta[iseg]  = prop.eta
 
 #====================================================================
 # see if this wing group has a specified lift fraction
@@ -203,14 +202,14 @@ class _run_hydra:
 # in any aircraft, there can only be 2 wing groups (or less)
 #====================================================================
          
-         try:
-            w.lift_frac = Wing['liftfraction']
-         except:
-            for j in range(ngroups):
-               if(j != i):
-                  k3                       = 'group' + str(j)
-                  wing.groups[j].lift_frac = aircraft['wing'][k3]['liftfraction']
-                  w.lift_frac              = 1.0 - wing.groups[j].lift_frac 
+            try:
+               w.lift_frac = Wing['liftfraction']
+            except:
+               for j in range(ngroups):
+                  if(j != i):
+                     k3                       = 'group' + str(j)
+                     wing.groups[j].lift_frac = aircraft['wing'][k3]['liftfraction']
+                     w.lift_frac              = 1.0 - wing.groups[j].lift_frac 
 
 #====================================================================
 # Set rotor properties based on 

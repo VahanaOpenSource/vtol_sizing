@@ -9,11 +9,14 @@
 
 import numpy as np
 
-from   mpi4py import MPI
-comm     = MPI.COMM_WORLD
-rank     = comm.Get_rank()
-nprocs   = comm.Get_size()
-
+try:
+   from   mpi4py import MPI
+   comm     = MPI.COMM_WORLD
+   rank     = comm.Get_rank()
+   nprocs   = comm.Get_size()
+except:
+   rank     = 0
+   nprocs   = 1
 #====================================================================
 # Begin function
 #====================================================================

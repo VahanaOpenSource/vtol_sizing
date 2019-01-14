@@ -78,6 +78,7 @@ Empirical:
 # Geometry parameters
    Geometry:
       fuselage_width:    1.0           # fuselage width = 1 standard US car, 2.04m wide
+      fuselage_length:   7.0           # fuselage length, meters, end to end
       clearance:         0.15          # clearance between two rotor discs, or disc/fuselage as fraction of radius
 
 # Empty weight: scaling factors for built-in equations to get sensitivity studies
@@ -139,15 +140,25 @@ Operations:
       Liability:           22000             # liability insurance, annual
       Inspection:          7700
       Insurance_percent:   4.5               # insurance cost, % of acquisition cost
-      Depreciation_percent: 10                # asset value loss per year, % of acquisition cost 
+      Depreciation_percent: 10               # asset value loss per year, % of acquisition cost 
+      Pilot:               280500            # Cost of keeping pilot on payroll
+      Training:            9900              # Annual cost of pilot training/update
    Hourly:
       Frame_maintenance:     37.35           # $/hr 
-      Rotor_inspection:       0.375          # $/hr/rotor 
-      Motor_inspection:       0.375          # $/hr/rotor 
-   Battery: 
-      Cycles:              1000
-      Cost_per_kwh:         250               # battery unit cost per unit energy capacity, $/kWh
-      Electricity:            0.165           # electricity cost per unit energy, $/kWh
+      Rotor_inspection:       1.0            # $/hr/rotor 
+      Motor_inspection:       0.625          # $/hr/rotor 
+   Battery:
+      Cycles:             900
+      Cost_per_kwh:       180.0              # battery unit cost per unit energy capacity, $/kWh
+      Electricity:          0.20             # electricity cost per unit energy, $/kWh
+   Vertiport:
+      Landing_fees:        20.0              # landing fee per flight, USD
+      Padding_time:        26.0              # time from curb -> UAM (before take-off) + UAM -> curb (after landing), minutes
+      Ground_distance:      2.0              # last leg distance in km
+   Taxi:
+      Distance_rate:        0.55             # Taxi price in USD per km 
+      Time_rate:            0.36             # USD/minute of taxi ride
+      Padding_time:        15.0              # airport gate to curb transfer time, minutes
 
 Redundancies:
    wing_flap:              1.0 

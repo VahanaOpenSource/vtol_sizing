@@ -29,6 +29,8 @@ class _cruisemodel:
    aircraft       = self.all_dict['aircraft']
    std            = self.constants
 
+   bfus           = emp.Geometry.fuselage_width
+   
 #====================================================================
 # Aircraft properties
 #====================================================================
@@ -98,8 +100,8 @@ class _cruisemodel:
 # Size wings (if required) + calculate performance
 #====================================================================
 
-   Wings_lift, Wings_f  = self.wing.cruise_sizing(W, segment, False)
-   Wing_drag            = fsdyn*Wings_f*1.2             # add 20% interference
+   Wings_lift, Wings_f  = self.wing.cruise_sizing(W, segment, False, bfus)
+   Wing_drag            = fsdyn*Wings_f*1.05             # add 20% interference
 
 #====================================================================
 # Find drag of all edgewise rotors (non-prop-rotors)

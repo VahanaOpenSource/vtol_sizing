@@ -14,6 +14,7 @@ def blade_wt_modelv2(Rotor, rotor_tech_factor):
 #===============================================================================
 
   spar        = spar_properties(Rotor['mat'].lower())
+  web         = spar_properties('090_carbon')
 
 #===============================================================================
 # Airfoil section properties: see test_airfoil.py
@@ -34,9 +35,18 @@ def blade_wt_modelv2(Rotor, rotor_tech_factor):
   tbyc        = 0.12            # blade thickness to chord ratio
   xRoot       = 0.1             # nondiml span length of root fitting
   Nstations   = 5               # number of spanwise stations
-  betap       = 3.0             # precone angle, deg
+
+#===============================================================================
+# precone angle, deg
+#===============================================================================
+
+  try:
+    betap     = Rotor['betap']
+  except:
+    betap     = 3.0             
   betap       = betap*pi/180.0  # precone angle, rad
 
+#  print(Rotor)
 #===============================================================================
 # check if the spar material has been initialized
 #===============================================================================
@@ -47,8 +57,8 @@ def blade_wt_modelv2(Rotor, rotor_tech_factor):
   chord       = Rotor['chord']
   R           = Rotor['R']
   Omega       = Rotor['Omega']
-  nz          = Rotor['nz']
-  Fz          = Rotor['Fz']
+  nz          = Rotor['nz']*1.5
+  Fz          = Rotor['Fz']/Rotor['nb']
 
   r           = numpy.linspace(xRoot,1.0,Nstations)
   b           = 0.14*chord 
@@ -74,13 +84,19 @@ def blade_wt_modelv2(Rotor, rotor_tech_factor):
 
 #===============================================================================
 # prepare constants for skin sizing
+#
+# skin assumed to be +/- 45 deg fabric, material properties from following page
+# http://www.acpsales.com/upload/Mechanical-Properties-of-Carbon-Fiber-Composite-Materials.pdf
+#
+# Note: for maximum shear stress in skin, used 47 MPa instead of 270 MPa 
+# as limiting value; using higher-strength version instead of high-modulus
 #===============================================================================
 
   Acs         = contour_pr['Atotal']*c2       # cross-section enclosed area, sq.m
   tmin        = 5e-4                          # 5 mm minimum
-  sigma_skin  = 47e6                          # yield stress in skin 
+  sigma_skin  = 47.0e6                        # yield stress in skin 
   rho_skin    = 1660.0                        # skin material density, kg/m^3
-  G_skin      = 33.0e9                        # skin shear modulus, Pa
+  G_skin      = 47.0e9                        # skin shear modulus, Pa
 
 #===============================================================================
 # total torsion moment at root and reference skin thickness (shear stress based)
@@ -96,11 +112,18 @@ def blade_wt_modelv2(Rotor, rotor_tech_factor):
 
   l_skin      = contour_pr['A_skin']*chord
   A_skin      = l_skin*ts_ref
-  m_skin      = A_skin*rho_skin         # skin mass per unit span
+  m_skin      = A_skin*rho_skin                   # skin mass per unit span, kg/m
+
+#===============================================================================
+# lightning strike protection + bonding: 0.2 kg/sq.m, or 0.2 x l_skin kg/m
+# piggyback on skin mass calculation: add 0.2 l_skin kg/m to skin mass
+#===============================================================================
+  
+  m_skin      = m_skin + l_skin*0.2 
   x_skin      = 0.49*chord 
 
-  Izz_skin    = contour_pr['Izzskin']*c3*ts_ref   # 
-  Iyy_skin    = contour_pr['Iyyskin']*c3*ts_ref   # 
+  Izz_skin    = contour_pr['Izzskin']*c3*ts_ref   #
+  Iyy_skin    = contour_pr['Iyyskin']*c3*ts_ref   #
   I_skin      = (Izz_skin + Iyy_skin)*rho_skin    # skin 2nd mass M.I, kg-m^2/m
 
 #===============================================================================
@@ -133,11 +156,14 @@ def blade_wt_modelv2(Rotor, rotor_tech_factor):
 # calculate filler (foam/HC) mass per span, CG at 57% chord
 #===============================================================================
 
-  rho_hc      = 52.0
+  try:
+    rho_hc    = Rotor['rho_hc']
+  except:
+    rho_hc    = 52.0
   A_hc        = chord*chord*tbyc*0.4905
   m_hc        = rho_hc*A_hc             # mass per unit span, honeycomb
   x_hc        = 0.57*chord
-
+#  print(m_hc*R*2.2)
   Ixx_hc      = contour_pr['mi2a_fill']*c4              # 2nd moment of area, entire CS
   Ixx_hc      = Ixx_hc - b*h*h*h/12.0 - h*b*b*b/12.0    # subtract out inertia from section replaced by spar
   I_hc        = Ixx_hc*rho_hc                           # rotational inertia of filler, kgm^2/m
@@ -153,6 +179,7 @@ def blade_wt_modelv2(Rotor, rotor_tech_factor):
   m_LE        = m_total*(4.0*x_CG/chord - 1.0)
   I_LE        = m_LE*0.25*0.25*c2                 # 2nd mass MI about QC for LE weight
 
+#  print('mass of non-strl components is ',(m_LEP+m_LE)*R, ' kg/blade')
 #===============================================================================
 # section aggregated properties without spar
 #===============================================================================
@@ -171,8 +198,8 @@ def blade_wt_modelv2(Rotor, rotor_tech_factor):
   nutsq       = 1.0 + pi*pi*0.25*GJ_skin/(I_total*Vtip*Vtip)
   nu_t        = numpy.sqrt(nutsq) 
   nut_tar     = 3.3       
-  if(nu_t < nut_tar):
-    print('warning:torsion frequency is not matched!!',nu_t)
+#  if(nu_t < nut_tar):
+#    print('warning:torsion frequency is not matched!!',nu_t)
 
 #===============================================================================
 # calculate thickness reqd to match torsion freq. target
@@ -224,7 +251,7 @@ def blade_wt_modelv2(Rotor, rotor_tech_factor):
 
     dRHS      = (M_out - CF_out*dR*betap - m_total*dR*betap*c0*0.5)/(h*b)
     dLHS      = c0*dR*betap*spar['rho']*(b+h)/(b*h)
-    RHS       = CFo*0.5/(b+h) + FBM/(b*h) + dRHS
+    RHS       = CFo*0.5/(b+h) + abs(FBM)/(b*h) + dRHS
 
 #===============================================================================
 # calculate coefficients and solve for spar thickness
@@ -232,24 +259,23 @@ def blade_wt_modelv2(Rotor, rotor_tech_factor):
 
     LHS       = spar['sigma_y']/nz - a0*(xout*xout-xin*xin)*0.5/(b+h) + dLHS
     t         = max(RHS/LHS,tmin)
-
+    # print('equation components',RHS,LHS)
 #===============================================================================
 # calculate shear web thickness required to carry vertical load
 # increase to box beam thickness if required
 #===============================================================================
     
     Vz        = (1.0 - xin*xin*xin)*Fz 
-    tweb      = 1.5*Vz/(h*sigma_skin/nz)
+    tweb      = Vz/(h*sigma_skin/nz)
 
-    if(t < tweb):
-      t       = tweb 
-
+#    if(t < tweb):
+#      print('web thickness overrride',tweb)
 #===============================================================================
 # calculate section thickness, mass and CF at root end
 # aggregate spar masses
 #===============================================================================
 
-    A_spar    = 2*(b*t+h*t)
+    A_spar    = 2*(b*t+h*tweb*0.5)
     m         = A_spar*spar['rho']       # spar mass per unit span, this segment
     spar_mass = spar_mass + m*dR
     M_out     = M_out     - CF_out*dR*betap - (m+m_total)*c0*dR*betap*0.5
@@ -288,9 +314,11 @@ def blade_wt_modelv2(Rotor, rotor_tech_factor):
 # total axial stress = due to CF + due to bending moment
 # that "3" shouldn't be there, not sure why its featured
   factor      = 3.0
-  RHS         = CF_out/(2.0*pi*rRoot*sigma_al) + eff_FBM/(factor*pi*rRoot*rRoot*sigma_al)
+  RHS         = CF_out/(2.0*pi*rRoot*sigma_al) + abs(eff_FBM)/(factor*pi*rRoot*rRoot*sigma_al)
   LHS         = 1.0 - rho_al/sigma_al*Omega*Omega*(xRoot*R)*0.5
   t_Root      = RHS/LHS 
+  if(t_Root < 0.001):
+    t_Root    = 0.001 
   m_Root      = 2*pi*rRoot*t_Root*(xRoot*R)*rho_al 
   m_total     = m_total + m_Root
 
@@ -322,6 +350,7 @@ def blade_wt_modelv2(Rotor, rotor_tech_factor):
   mass_blade  = mass_blade*rotor_tech_factor 
   mass_hub    = mass_hub  *rotor_tech_factor
   mass_act    = mass_act  *rotor_tech_factor
+  total       = mass_blade + mass_hub + mass_act 
 
 #===============================================================================
 # return dictionary
@@ -329,10 +358,11 @@ def blade_wt_modelv2(Rotor, rotor_tech_factor):
 
   mass_rotor  = {'blades'  : mass_blade,
                  'hub'     : mass_hub,
-                 'actuator': mass_act}
+                 'actuatr' : mass_act}
 
+#  print(mass_rotor)
 #===============================================================================
 # End of operations
 #===============================================================================
   
-  return mass_rotor
+  return mass_rotor, total 

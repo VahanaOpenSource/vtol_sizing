@@ -48,6 +48,25 @@ module bemt_types
         real(kind=rdp)      :: rpm_ratio = 0.5d0        ! cruise to hover RPM ratio
     end type 
 
+!====================================================================
+! rotor geometry details (use in calculations)
+!====================================================================
+
+    type :: rotor_def
+        logical                         :: use_tables = .true.
+        integer                         :: Nb                ! get from inputs
+        integer                         :: Nomega = mxOmega
+        real(kind=rdp)                  :: radius, solidity  ! get from inputs 
+        real(kind=rdp)                  :: omega, th0, power
+        real(kind=rdp)                  :: rcout = 0.1d0     ! root cut out/radius, nondiml
+        real(kind=rdp)                  :: CL_alpha
+        real(kind=rdp)                  :: Cdo
+        real(kind=rdp)                  :: th_75
+        real(kind=rdp), dimension(Nseg) :: r, chord, twist              ! calculate from design
+        real(kind=rdp), dimension(Nseg) :: alpha, inflow, dCTdr, dCPdr  ! calculate from design
+        real(kind=rdp)                  :: eta
+    end type
+
 end module
 
 !====================================================================
@@ -59,4 +78,5 @@ module bemt_interface
     type(inter_def)     :: Inputs
     type(case_def)      :: best_design
     type(flt_def)       :: flt(nfc)
+    type(rotor_def)     :: best_rotor
 end module
