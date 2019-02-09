@@ -12,7 +12,7 @@ import os
 class _idlemodel:
   def idlemodel(self, segID, itercount):
 
-   icontinue = 1
+   icontinue      = 1
 
 #====================================================================
 # assign pointer shortcuts
@@ -21,18 +21,10 @@ class _idlemodel:
    mission        = self.mission
    rotor          = self.rotor
    pi             = self.constants.pi
-   aircraftID     = self.aircraft.aircraftid 
 
-   iseg           = segID - 1 # convert to BASE 0
+   iseg           = segID - 1       # python counting
 
    segment        = mission.segment[iseg]
-
-#====================================================================
-# set local atmospheric conditions
-#====================================================================
-
-   alt                   = segment.startalt
-   temp                  = segment.deltatempisa
 
 #====================================================================
 # if first iteration (assume idle power is a fraction of total power)
@@ -47,7 +39,6 @@ class _idlemodel:
       
    else:
       cd0                  = self.rotor.cd0
-
       cpProfile            = rotor.solidity * cd0 / 8.0
 
       Cptotal              = cpProfile *rotor.num

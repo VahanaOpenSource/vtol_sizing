@@ -18,14 +18,14 @@ omega_eng   = 6000  # (rpm)
 f_rs        = 0.1    # fraction of wt for rotor shaft in (gearbox+rotor shaft) weight
 #num_ds      = 1     # number of intermediate drive shafts
 #f_q         = 0.03  # second rotor torque (main or tail)
-#imodel      = 'afdd83'
-imodel      = 'afdd00'
+imodel      = 'afdd83'
+#imodel      = 'afdd00'
 
 #==================================================================
 # FIXED VALUES
 #==================================================================
 
-def drivesys_weight(vehicle_parameters, bfile=None):
+def drivesys_weight(vehicle_parameters):
     
 
 #==================================================================
@@ -33,17 +33,16 @@ def drivesys_weight(vehicle_parameters, bfile=None):
 #==================================================================
    
    nrotor       = vehicle_parameters['nrotor']
-   R            = vehicle_parameters['radius']
-   nu_blade     = vehicle_parameters['nu_blade']
    wblade       = vehicle_parameters['wblade']
    len_ds       = vehicle_parameters['len_ds']
    q_DSlimit    = vehicle_parameters['q_DSlimit']   # torque limit for Xmsn
-   P_DSlimit    = vehicle_parameters['pwr_installed']
-   aid          = vehicle_parameters['aircraftID']
+   P_DSlimit    = vehicle_parameters['P_DSlimit']
    N_at         = vehicle_parameters['nprop']       # propeller count 
-   omega        = vehicle_parameters['Omega']
-   fac          = vehicle_parameters['tech_factors'].drive_system
+   omega        = vehicle_parameters['omega']
+   fac          = vehicle_parameters['fac']
+
    omega        = omega*30.0/pi                     # in RPM
+
 #==================================================================
 # limit torque 
 #==================================================================
@@ -145,8 +144,7 @@ def drivesys_weight(vehicle_parameters, bfile=None):
 #==================================================================
 
    drive_system   = {     'gearbox': wght_gb*lb2kg, 'rotor_shafts': wght_rs*lb2kg,  \
-                     'rotor_brakes': wght_rb*lb2kg,   'tail_shaft': wght_ds*lb2kg,  \
-                            'total': total*lb2kg}
+                     'rotor_brakes': wght_rb*lb2kg,   'tail_shaft': wght_ds*lb2kg   }
    return drive_system
 
 #====================

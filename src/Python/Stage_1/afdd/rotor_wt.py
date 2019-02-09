@@ -26,7 +26,8 @@ def rotor_weight(vehicle_parameters):
    chord      = vehicle_parameters['chord']    
    V_tip      = vehicle_parameters['vtip']    
    nu_blade   = vehicle_parameters['nu_blade'] 
-     
+   factor     = vehicle_parameters['tech_factor']
+
 #====================================================================
 # extra parameters for tilt-rotor
 #====================================================================
@@ -95,7 +96,6 @@ def rotor_weight(vehicle_parameters):
 # Apply tech factor for rotor group
 #====================================================================
 
-   factor       = vehicle_parameters['tech_factors'].rotor
    wght_blade   = wght_blade*factor 
    wght_hub     = wght_hub  *factor 
    wght_spin    = wght_spin *factor
@@ -105,20 +105,18 @@ def rotor_weight(vehicle_parameters):
 # mass of components in kg
 #====================================================================
 
-   total = wght_blade + wght_hub + wght_spin + wght_fold 
+#   total = wght_blade + wght_hub + wght_spin + wght_fold 
+#   total roll-up is performed outside in empty weights
 
-   weight = {'blade'   : wght_blade*lb2kg,
-             'hub'     : wght_hub*lb2kg,
-             'spinner' : wght_spin*lb2kg,
-             'folding' : wght_fold*lb2kg,
-             'total'   : total*lb2kg}
+   weight = {'blades'  : wght_blade *lb2kg,
+             'hub'     : wght_hub   *lb2kg,
+             'spinner' : wght_spin  *lb2kg,
+             'folding' : wght_fold  *lb2kg}
 
-#====================================================================
-# also calculate cost
-#====================================================================
+   mass_kg_per_unit   = (wght_blade + wght_hub + wght_spin + wght_fold)/nrotor*lb2kg
 
 #====================================================================
 # return the dictionary
 #====================================================================
 
-   return weight
+   return weight, mass_kg_per_unit

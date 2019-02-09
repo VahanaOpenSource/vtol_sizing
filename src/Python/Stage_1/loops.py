@@ -62,6 +62,18 @@ class _loops:
       all_lists   = {}
 
 #=======================================================================
+# fuselage design variables
+#=======================================================================
+
+      if 'fuselage' in sizing_dict:
+            Fuselage       = sizing_dict['fuselage']
+            st             = 'Fuselage'
+#loop over fuselage design parameters
+            for key,value in Fuselage.items():
+               st1         = st.lower() + '_' + key 
+               all_lists[st1] = value
+
+#=======================================================================
 # wing design variables
 #find # wing groups. Members within a group are identical   
 #=======================================================================
@@ -214,8 +226,9 @@ class _loops:
 
       aircraft_dict['wing']         = {}
       aircraft_dict['rotor']        = {}
+      aircraft_dict['fuselage']     = {}
 
-      if(bool(self.wing)):
+      if(self.wing.ngroups > 0):
          for i in range(self.wing.ngroups):
             aircraft_dict['wing']['group'+str(i)]          = {} 
 
@@ -227,6 +240,13 @@ class _loops:
             replace_str                = k0+'_'+k1+'_'
             k                          = key.replace(replace_str,"")
             aircraft_dict[k0][k1][k]   = lst
+
+         elif key.startswith('fuselage_'):
+            kspl                       = key.split('_')
+            k0                         = kspl[0]            # fuselage
+            k1                         = kspl[1]
+            aircraft_dict[k0][k1]      = lst
+            
 #========================================================================
 # For rotor, nest properties in a dictionary under wing dictionary
 #========================================================================

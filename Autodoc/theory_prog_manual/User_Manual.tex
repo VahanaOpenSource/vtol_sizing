@@ -1,0 +1,63 @@
+%This template was prepared by Dorothea F. Brosius of the 
+%Institute for Electronics and Applied Physics, University of Maryland, College Park, MD
+%The template was last updated in March 2013
+%Thesis Main Page used with thesis.sty based on the
+%University of Maryland Electronic Thesis and Dissertation (ETD) Style Guide
+
+\documentclass[12pt]{article}  %12pt is larger than 11pt
+
+%list of packages to use   
+\include{packagelist}
+
+%custom commands by AS
+\include{commandlist}
+
+\pagestyle{empty}
+\begin{document}
+
+\include{Title_UM} %(must follow Abstract, non-numbered)
+
+
+%Pages from this point start at lower-case Roman number ii)
+\pagestyle{plain}
+\pagenumbering{roman}
+\setcounter{page}{2}
+
+\renewcommand{\baselinestretch}{1}
+\small\normalsize
+\tableofcontents %(required, lower-case Roman)
+%\newpage
+%\listoftables %(if present, lower-case Roman)
+%\newpage
+%listoffigures %(if present, lower-case Roman)
+%\newpage
+% LIST OF ABBREVIATIONS
+\addcontentsline{toc}{section}{List of Abbreviations}
+%\include{Abbreviations}
+
+\newpage
+\setlength{\parskip}{0em}
+\renewcommand{\baselinestretch}{2}
+\small\normalsize
+
+%Pages from this point start at Arabic numeral 1
+\setcounter{page}{1}
+\pagenumbering{arabic}
+
+%\include{Methodology} 			% Theory manual
+%\include{VSNDARC} 				% Comparison to NDARC
+\include{Organization}              % code organization
+\include{Setup} 						% initial setup for the code
+\include{Inputs} 						% Input files
+\include{Outputs} 					% Output files
+\include{Postprocessing} 		% Postprocessing
+%\include{Appendices} 				% Appendix
+\include{WhatNext} 				% What next?
+
+\renewcommand{\baselinestretch}{1}
+\small\normalsize
+\newpage
+\bibliographystyle{ieeetr} 
+\bibliography{references} 
+
+\end{document}

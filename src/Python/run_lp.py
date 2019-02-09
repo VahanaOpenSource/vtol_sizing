@@ -147,6 +147,7 @@ def run_lp(als, rotDir, dTdTau, dMzdTau, ndof, ncontrols, \
     if not(res.success):
         print('linear programming problem DID NOT CONVERGE!!')
         print('warning: COULD NOT FIND MAX TORQUE LIMIT!')
+        print(res.status,res.message)
     meantau                 = numpy.mean(hoverTau)
 
 #=================================================================================
@@ -171,9 +172,13 @@ def run_lp(als, rotDir, dTdTau, dMzdTau, ndof, ncontrols, \
     f2      = dFMdTau[-1,:]
     Aeq2    = dFMdTau[0:3,:]
     beq2    = beq[0:3]
-    res2    = linprog(f2,A_ub=None,b_ub=None,A_eq=Aeq2,b_eq=beq2,bounds=bounds2,method='interior-point')
+    if(res.success):
+        res2    = linprog(f2,A_ub=None,b_ub=None,A_eq=Aeq2,b_eq=beq2,bounds=bounds2,method='interior-point')
+        MzMax   = res2.fun
+    else:
+        MzMax   = 0.0
 #    if not(res2.success):
 #        print(res2)
 #        print('linear programming problem for max yawing moment DID NOT CONVERGE!!')
 #        print(numpy.mean(als[0:4])*180.0/numpy.pi)
-    return res.x, res.fun, meantau, res2.fun
+    return res.x, res.fun, meantau, MzMax

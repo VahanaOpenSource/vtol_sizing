@@ -7,12 +7,12 @@
 import sys
 from conversions import *
 f_cw          = 1.3131  # 1.3131 for crashworthiness
-f_bt          = 1.2     # for ballistic survivability
-#k0_plumb      = 120    # constant weight 
-#k1_plumb      = 3      # proportional weight 
+f_bt          = 1.8     # for ballistic survivability
+#k0_plumb      = 120    # constant weight; default
+#k1_plumb      = 3      # proportional weight; default
 nint          = 1       # number of internal tanks
-fuel_scaling  = 1.2     # allow extra fuel capacity for (a) unused (b) mission flexibility
-density       = 6.7     # fuel density in lb/gallons; value 6.7 is for jet fuel
+fuel_scaling  = 1.42    # allow extra fuel capacity for (a) unused (b) mission flexibility
+density       = 6.5     # fuel density in lb/gallons; value 6.7 is for jet fuel
 
 #====================================================================
 # begin routine

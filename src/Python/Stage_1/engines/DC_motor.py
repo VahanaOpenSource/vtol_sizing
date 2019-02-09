@@ -47,13 +47,13 @@ def DC_motor(P):
         m_esc      = I * 32.0 / 7.25
 
         m_total    = m_motor  + m_esc
+
 #====================================================================
 # full-scale data: the speed controller is included in the data fit
-# fit is power in Hp vs. weight in lbs; use conversion factors to
-# adapt it to Kg and Kwatt
+# fit is power in kW vs. mass in kg 
 #====================================================================
 
-    else:                                    
-        m_total    = (1.4892 * (P/0.746)**0.7827)/2.2
+    else:
+        m_total    = 0.8373*P**0.726
         #print('rated power in kW is ',P)
     return m_total 

@@ -9,10 +9,17 @@ import itertools
 import yaml
 import matplotlib.pyplot as plt
 
-from mpi4py import MPI 
-comm      = MPI.COMM_WORLD
-rank      = comm.Get_rank()
-nprocs    = comm.Get_size()
+try:
+  from mpi4py import MPI 
+  comm      = MPI.COMM_WORLD
+  rank      = comm.Get_rank()
+  nprocs    = comm.Get_size()
+  MPI_found = True
+except:
+  rank      = 0 
+  nprocs    = 1
+  MPI_found = False 
+  pass 
 
 # ===================================================================
 # Driver file for hydra sizing
@@ -47,7 +54,8 @@ if(rank == 0):
     pass
   os.makedirs(log_dir)
 
-comm.Barrier()
+if(MPI_found):
+  comm.Barrier()
 
 # ===================================================================
 # load empirical parameters and inputs
@@ -68,13 +76,8 @@ fyaml['Sizing']. update(fdefault['Sizing'])
 sizing_dict      = fyaml['Sizing']
 mission_dict     = fyaml['Mission']
 aircraft_dict    = fyaml['Aircraft']
+configuration    = fyaml['Configuration']
 empirical_dict   = fdefault['Empirical']
-
-try:
-  configuration  = fyaml['Configuration']
-except:
-  configuration  = {}
-
 try:
   ops_dict       = fdefault['Operations']
 except:
@@ -83,14 +86,12 @@ except:
 try:
   acq_dict       = fdefault['Acquisition']
 except:
-  acq_dict       = {}
-
+  acq_dict       = {} 
+  
 try:
   redund         = fdefault['Redundancies']
 except:
-  redund         = {}
-
-#beta_factors     = fdefault['Beta_factors']
+  redund         = {} 
 
 all_dict = { 'empirical' : empirical_dict,  \
              'mission'   : mission_dict,    \
@@ -105,7 +106,7 @@ all_dict = { 'empirical' : empirical_dict,  \
 # create instance of hydraInterface class
 # ===================================================================
 
-x = hydraInterface(all_dict)
+x                        = hydraInterface(all_dict, MPI_found)
 
 # ===================================================================
 # create loops based on input.yaml 
@@ -152,7 +153,8 @@ for icom,com in enumerate(all_combinations):
 # print message to screen with diagnostics
 # ===================================================================
 
-comm.Barrier()
+if(x.MPI_found):
+  comm.Barrier()
 t2 =  time.time()
 if(rank == 0):
   print ('\n Computation time taken is %6.4f seconds' %(t2-t1))

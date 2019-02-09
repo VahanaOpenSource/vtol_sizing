@@ -22,16 +22,22 @@ class _hovermodel:
 
    mission        = self.mission 
    aircraft       = self.all_dict['aircraft']
-   engine         = self.emp_data.Engines
-   motor          = self.motor 
+   transmission   = self.transmission    
    grav           = self.constants.grav
    wing           = self.wing
    rotor          = self.rotor 
+   fuselage       = self.fuselage 
+
+#====================================================================
+# loop over fuselage and wing groups
+#====================================================================
+
    ngroups        = wing.ngroups
+   if(fuselage.nrotors > 0):
+      ngroups     = ngroups + 1
+
    aircraftID     = aircraft['aircraftID'] 
    do_sizing      = update
-   effHoverPower  = engine.eff_hover_power 
-   self.engine.fracPowerMCP  = 1.0
 
    iseg           = segID - 1
    rho            = mission.segment[iseg].rho
@@ -60,46 +66,36 @@ class _hovermodel:
 
    W           = massSegmentPrev*grav 
    Rmax        = self.constraints.max_rotor_radius
-   geom        = self.emp_data.Geometry
+   geom        = self.geometry
    clearance   = geom.clearance           # rotor clearance as fraction of radius
-   bfus        = geom.fuselage_width      # in meters 
+   bfus        = geom.fuselage_width         # in meters 
 
 #====================================================================
-# loop over wing groups; associated with each wing group,
-# we have a rotor group ID; find that rotor group 
+# loop over wing groups and fuselage groups; associated with each wing 
+# group or fuselage, we have a rotor group ID; find that rotor group 
 #====================================================================
 
    for i in range(ngroups):
-      wing_group     = wing.groups[i]
-      rid            = wing_group.rotor_group_id
-      rotor_group    = rotor.groups[rid]
-      nrotors        = wing_group.nrotors       # left+right wings!
-      lift_frac      = wing_group.lift_frac
+      if(i < wing.ngroups):
+         src         = wing.groups[i]
+      else:
+         src         = fuselage
 
+      rid            = src.rotor_group_id
+      nrotors        = src.nrotors       # all rotors in this group
+      lift_frac      = src.lift_frac
+      rotor_group    = rotor.groups[rid]
       hvrDwldFactor  = rotor_group.hvr_dwld 
 
       if rotor_group.thrust_share == 'equal':
          thrust      = W*(1+hvrDwldFactor)/rotor.nrotors
-         # print('hacking hover thrust to be equal for all rotors')
       else:
          thrust      = W*lift_frac*(1.0+hvrDwldFactor)/nrotors       # thrust per rotor in the group
-
-#      if(thrust < 0):
-#         print(W)
-#         quit('BANG')
-#====================================================================
-# get motor group information (efficiencies)
-#====================================================================
-
-      mgid                    = rotor_group.motor_group_id 
-      motor_group             = motor.groups[mgid]
-      eta_motor               = motor_group.hover_efficiency 
 
 #====================================================================
 # perform sizing calculations if update is required
 #====================================================================
 
-#      print('segment # ',iseg,thrust)
       if do_sizing:                                   # perform sizing calculations
          rotor_group.sizing(thrust, rho, Rmax, self.wing.groups, clearance, bfus)
          rotor_group.ainf        = mission.segment[iseg].ainf 
@@ -115,27 +111,38 @@ class _hovermodel:
 # Compute the power required in hover (watts)
 #====================================================================
 
-      FM                   = wing_group.rotor_aero_eta[iseg]     # default 0.75; replaced by BEMT calc
+      FM                   = src.rotor_aero_eta[iseg]     # default 0.75; replaced by BEMT calc
       Phover               = rotor_group.hover_power(thrust, rho, FM, use_bemt, update)
-      omega                = rotor_group.tipspeed/rotor_group.radius 
+      omega                = rotor_group.tipspeed/rotor_group.radius
+      Qhover               = Phover/omega 
 
 #====================================================================
-# Total power in hover due to MR and accs.
+# Mechanical power to turn rotor shaft (kW) in hover condition
+# assuming that the number of rotor groups =1 on fuselage/each wing
+# For each structure on which rotors are present (fuselage or wings),
+# we remember the rotor thrust, power and torque for sizing 2 other 
+# components:
+# (1) wing structure
+# (2) individual drive motors (for electric transmission)
 #====================================================================
 
-      rotor_power    = (Phover)#*(1.0/effHoverPower + powerHoverAccs)
-      engine_power   = rotor_power/eta_motor
+      src.rotor_power[iseg]    = Phover          # power  per rotor, watts
+      src.rotor_torque[iseg]   = Phover/omega    # torque per rotor, Nm
+      src.rotor_thrust[iseg]   = thrust
+      
+#====================================================================
+# get transmission group ID: rotors in a group powered by only one 
+# transmission! 
+#====================================================================
+
+      xgid           = rotor_group.xmsn_group_id 
 
 #====================================================================
-# power in kilowatts and torque in N-m; this is for a given rotor set
-# belonging to a wing group, added over all rotors and all wings in 
-# that group
+# calculate power supplied to the transmission 
 #====================================================================
 
-      wing_group.motor_power[iseg]    = engine_power         # power  per motor, watts 
-      wing_group.rotor_power[iseg]    = rotor_power          # power  per rotor, watts
-      wing_group.rotor_torque[iseg]   = Phover/omega         # torque per rotor, Nm
-      wing_group.rotor_thrust[iseg]   = thrust
+      transmission.groups[xgid].power_req[iseg,rid]    = Phover*rotor_group.nrotors
+      transmission.groups[xgid].torque_req[iseg,rid]   = Qhover*rotor_group.nrotors
 
 #====================================================================
 # calculate areas for vertical-axis and horizontal-axis rotors
@@ -151,8 +158,13 @@ class _hovermodel:
             rotor.Atilt    = rotor.Atilt + group.area*group.nrotors
          elif(group.type == 'lift'):
             rotor.Alift    = rotor.Alift + group.area*group.nrotors 
+            # print('lifting rotors',group.area,group.nrotors)
          elif(group.type == 'cruise'):
             rotor.Acruise  = rotor.Acruise + group.area*group.nrotors 
+         else:
+            print('unknown rotor type',group.type)
+            print('valid options are tilting, lift or cruise')
+            quit()
 
 #====================================================================
 # total rotor areas available for propulsive thrust
@@ -164,7 +176,8 @@ class _hovermodel:
 
       if(Alift == 0):
          print('THERE ARE NO VERTICAL-AXIS ROTORS FOR LIFT-OFF')
-         quit('STOP TRYING TO DESIGN FIXED-WING AIRCRAFT')
+         print(rotor.Atilt,rotor.Alift,rotor.Acruise)
+         quit('CRITICAL ERROR: CANNOT SIZE FIXED-WING AIRCRAFT')
 
 #====================================================================
 # Loop over rotor groups and calculate area ratios
@@ -223,12 +236,5 @@ class _hovermodel:
             group.Arat_lift   = Agroup/Alift          # area ratio of rotor group in hover
             group.Arat_thrust = Agroup/Athrust        # area ratio of rotor group in cruise
 
-#====================================================================
-#adding tail rotor power for single MR type aircraft: 10% additional 
-#====================================================================
-
-   if (aircraftID == 1):
-      quit('not yet ready: tail rotor power in hover')
-      mission.segment[iseg].p_req *= 1.1
 
    return icontinue

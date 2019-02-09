@@ -1,8 +1,6 @@
 #
-# HYDRA CLASS INTERFACE
+# HYDRA MASTER CLASS 
 #
-#####################################################################
-
 #====================================================================
 # standard Python modules
 #====================================================================
@@ -48,9 +46,13 @@ import pbmodel, bemt_performance
 from segment               import all_segments 
 from component_classes     import prop_sizing, constants
 from fuselage_class        import fuselage
-from rotor_class           import rotors, motors
+from rotor_class           import rotors
+from motor_class           import motors 
+from engine_class          import all_engines
+from powerplant_class      import powerplant
 from wing_class            import wings
 from dict2obj              import obj
+from transmission_class    import transmission 
 
 #====================================================================
 # HYDRA MASTER CLASS
@@ -111,8 +113,6 @@ class hydraInterface(loops                  . _loops,
       self.emp_data     = obj(ad['empirical'])
       self.constraints  = obj(ad['sizing']['Constraints'])
 
-      self.fuselage     = fuselage()
-
 #====================================================================
 # Find payload and common equipment required
 #====================================================================
@@ -125,28 +125,57 @@ class hydraInterface(loops                  . _loops,
       self.mission      = all_segments(ad['mission'], payload)
 
 #====================================================================
-# Powerplant type
+# initialize classes for rotor -> must be present!
 #====================================================================
 
-      self.etype        = self.all_dict['aircraft']['engineType']
+      self.rotor        = rotors(ad['sizing']['Rotors'], self.mission.nseg)
 
-#initialize classes for rotor and wing sizing information
+#====================================================================
+# initialize fuselage class
+#====================================================================
+
+      self.fuselage     = fuselage(ad['sizing']['Fuselage'],self.mission.nseg)
+
+#====================================================================
+#initialize classes for constants and propellers
+#====================================================================
+
       self.constants    = constants()
-      # print 'initializing wing',all_dict['sizing']['Wings']
       self.prop         = prop_sizing(ad['aircraft'])
-      if(self.etype == 'electric_motor' or self.etype.endswith('electric')):
-         self.motor     = motors(all_dict['empirical']['Motors'], self.mission.nseg)
-      else:
-         self.motor     = {}
-      self.rotor        = rotors(all_dict['sizing']['Rotors'], self.mission.nseg)
+
+#====================================================================
+# Powerplant class: producing mechanical or electrical energy
+#====================================================================
+      
+      self.powerplant   = powerplant(ad, self.mission.nseg)
+
+#====================================================================
+# transmission class: to send energy from powerplant to rotor
+#====================================================================
+
+      self.transmission = transmission(ad, self.mission.nseg, self.rotor.ngroups)
+
+#====================================================================
+# initialize motor classes as necessary
+#====================================================================
+
+#      if(self.transmission.motors_present):
+#         self.motor     = motors(ad['empirical']['Motors'], self.mission.nseg)
+#      else:
+#         self.motor     = motors()
+
+#====================================================================
+# wing design parameters: initialize only when wing present
+#====================================================================
 
       if('Wings' in all_dict['sizing']):
          self.wing      = wings(all_dict['sizing']['Wings'], self.mission.nseg)
       else:
-         self.wing      = {}
+         self.wing      = wings()
 
 #====================================================================
-# Create connections to remember rotor -> wing and rotor -> motor maps
+# Create connections to remember rotor -> wing, rotor -> motor and 
+# fuselage -> rotor maps
 #====================================================================
 
       self.map_all(all_dict['config'])
@@ -378,11 +407,11 @@ class hydraInterface(loops                  . _loops,
       array[1]             = self.massTakeoff            # kg
       array[2]             = self.p_ins                  # kW, installed power
 
-      if(self.mass_fuel > 1e-3):
-         array[3]          = self.mass_fuel              # kgs
+      if(self.powerplant.mass_fuel > 1e-3):
+         array[3]          = self.powerplant.mass_fuel   # kgs
 
       if(self.mass_battery > 1e-3):
-         array[4]          = self.mass_battery           # kgs
+         array[4]          = self.powerplant.mass_battery# kgs
 
       array[5]             = self.mission.payload        # kg
       array[6]             = self.costs.variable_costs   # USD/hr
@@ -390,8 +419,9 @@ class hydraInterface(loops                  . _loops,
       array[7]             = self.footprint
 
       return array
+
 #====================================================================
-# function to find footprint
+# function to calculate, update and store footprint
 #====================================================================
 
    def footprint_update(self):
@@ -406,7 +436,9 @@ class hydraInterface(loops                  . _loops,
          for i in range(group.nwings):
             spans.append(group.span)
 
-      l_fus                = self.emp_data.Geometry.fuselage_length
+      if(ngroups == 0):
+         spans.append(rotor.groups[0].radius*2)
+      l_fus                = self.geometry.fuselage_length
       self.footprint       = footprint_calc(spans, l_fus)
 
       return None
@@ -425,7 +457,7 @@ class hydraInterface(loops                  . _loops,
       wing              = self.wing 
       rotor             = self.rotor 
       aid               = self.all_dict['aircraft']['aircraftID']
-      geom              = self.emp_data.Geometry
+      geom              = self.geometry
       self.valid        = True
       self.errmsg       = 'valid design'
       iterCountMax      = 100
@@ -564,59 +596,113 @@ class hydraInterface(loops                  . _loops,
 
 
 #====================================================================
-# mapping from wing group(s) -> rotor group 
-#and rotor group(s) -> motor group
+# mapping from wing group(s)/fuselage -> rotor group --> Xmsn --> powerplant
 #====================================================================
 
    def map_all(self, config_dict):
 
 #====================================================================
 # rotor performance/sizing: need to know mapping from wings to rotors
+# Presently, only one rotor group allowed per wing
 #====================================================================
 
-      if(bool(self.wing)):
+      Nrotors              = 0
+      if(self.wing.ngroups > 0 and 'Wings' in config_dict):
 
          Wing_rotor_map    = config_dict['Wings']
 
          for wing_group_name,rotor_group_name in Wing_rotor_map.items():
+
             wing_group_id  = find_group_id(wing_group_name, self.wing)
             rotor_group_id = find_group_id(rotor_group_name, self.rotor)
 
-            self.wing.groups[wing_group_id].rotor_group_id = rotor_group_id
+            wgroup         = self.wing.groups[wing_group_id]
+
+            wgroup.rotor_group_id = rotor_group_id
             self.rotor.groups[rotor_group_id].wing_group_ids.append(wing_group_id)
+
+# find total # rotors in system: add rotors from all wings in this group
+            Nrotors        = Nrotors + wgroup.nrotors
 
 #====================================================================
 # fuselage-mounted rotors: edgewise rotors (SMR/Coax)
+# Presently, only one rotor group allowed per fuselage
 #====================================================================
 
-      else:      
-         Fuselage       = config_dict['Fuselage']
-         rotor_group_id = find_group_id(rotor_group_name, self.rotor)
-         self.fuselage.rotor_group_id           = rotor_group_id
-         self.rotor.groups[rotor_group_id].type = 'edgewise'
-         self.nrotors                           = Fuselage['nrotors']
-         
+      if(self.fuselage.nrotors > 0):
+         rotor_group_name              = config_dict['Fuselage']
+         rotor_group_id                = find_group_id(rotor_group_name, self.rotor)
+
+         self.fuselage.rotor_group_id  = rotor_group_id
+         rgroup                        = self.rotor.groups[rotor_group_id]
+         rgroup.type                   = 'lift'
+         rgroup.fuse_group_id          = 0
+
+         Nrotors                       = Nrotors + self.fuselage.nrotors
+
+         print('assuming fuselage-mounted rotors are edgewise.. set attributes based on inputs')
+
 #====================================================================
-# motor sizing: need to know mapping from rotors to motors
+# remember total number of rotors
+#====================================================================
+      
+      self.rotor.nrotors               = Nrotors 
+
+#====================================================================
+# Create rotor -> transmission mapping
+# loop over all rotor groups
 #====================================================================
 
-      try:
-         Rotor_motor_map   = config_dict['Rotors']
-         for rotor_group_name,motor_group_name in Rotor_motor_map.items():
-            rotor_group_id  = find_group_id(rotor_group_name, self.rotor)
-            motor_group_id  = find_group_id(motor_group_name, self.motor)
+      RXMap       = config_dict['Rotors']
 
-            self.rotor.groups[rotor_group_id].motor_group_id = motor_group_id
-            self.motor.groups[motor_group_id].rotor_group_ids.append(rotor_group_id)
+      for rgname,xgname in RXMap.items():
+         rgid     = find_group_id(rgname, self.rotor)
+         xgid     = find_group_id(xgname, self.transmission)
 
-      except:
-         print('Rotors on this VTOL is not driven by electric motors')
+# one rotor can be powered by a single transmission group
+         self.rotor.groups[rgid].xmsn_group_id = xgid
+
+# remember input power type for this rotor group
+         self.rotor.groups[rgid].input_power = self.transmission.groups[xgid].type
+
+# one transmission can transmit power to multiple rotor groups         
+         self.transmission.groups[xgid].rotor_group_ids.append(rotor_group_id)
+
+#====================================================================
+# Create transmission -> powerplant maps
+#====================================================================
+
+      XPmap       = config_dict['Transmission']
+      Nplant      = 0
+      for xgname,xgdata in XPmap.items():
+
+         pgname   = xgdata['Powerplant']
+         xgid     = find_group_id(xgname, self.transmission)
+         pgid     = find_group_id(pgname, self.powerplant)
+         prat     = xgdata['PowerFraction']
+# one transmission can be connected to multiple powerplants
+         tgroup   = self.transmission.groups[xgid]
+         pgroup   = self.powerplant.groups[pgid]
+
+         tgroup.powerplant_group_ids.append(pgid)
+         tgroup.powerplant_power_rat.append(prat)
+
+         if(tgroup.type == 'electric' and pgroup.type in ['turboshaft','piston_engine']):
+            quit('add logic for including generator after engine')
+            
+# one powerplant can be connected to multiple transmissions
+         pgroup.xmsn_group_ids.append(xgid)
+
+         Nplant   = Nplant + pgroup.npowerplant
+
+# remember total number of engines
+      self.powerplant.nengines = Nplant
 
 #====================================================================
 # Count how many rotors there are in a single rotor group
 #====================================================================
       
-      if(bool(self.wing)):
+      if(self.wing.ngroups > 0):
          for i in range(self.rotor.ngroups):
             wing_group_ids     = self.rotor.groups[i].wing_group_ids
       
@@ -628,9 +714,13 @@ class hydraInterface(loops                  . _loops,
 #find total # of rotors of this group type, in the aircraft
             self.rotor.groups[i].nrotors  = nrotors 
 
-      else:
-         self.rotor.groups[0].nrotors     = 1
-         print('defaulting to one rotor')
+#====================================================================
+# count how many rotors there are in the fuselage
+#====================================================================
+
+      if(self.fuselage.nrotors > 0):
+         rgid                             = self.fuselage.rotor_group_id
+         self.rotor.groups[rgid].nrotors  = self.fuselage.nrotors 
 
 #====================================================================
 # Count how many motors there are in a single motor group with the 
@@ -639,26 +729,25 @@ class hydraInterface(loops                  . _loops,
 #====================================================================
 
 #====================================================================
-# Loop over motor groups
+# Loop over transmission groups
 #====================================================================
 
-      Ntotal      = 0
-
-      if(bool(self.motor)):
-         for i in range(self.motor.ngroups):
-            mgroup   = self.motor.groups[i]
-            nmotors  = 0 
+      for i in range(self.transmission.ngroups):
+         group    = self.transmission.groups[i]
+         if(group.type == 'electric'):
 
 #====================================================================
-# Find which rotor groups are associated with these motors
+# Find which rotor groups are associated with this transmission
 #====================================================================
 
-            rotor_group_ids    = mgroup.rotor_group_ids
+            rotor_group_ids    = group.rotor_group_ids
 
 #====================================================================
-# Loop over rotor groups and find wings groups where they are mounted
+# Loop over rotor sets belonging to this transmission group
+# count how many drive motors are needed
 #====================================================================
 
+            nmotors            = 0
             for rgid in rotor_group_ids: 
                nmotors         = nmotors + self.rotor.groups[rgid].nrotors
 
@@ -666,11 +755,7 @@ class hydraInterface(loops                  . _loops,
 # remember values in a class
 #====================================================================
 
-            mgroup.nmotors = nmotors
-            Ntotal         = Ntotal + nmotors
-         
-         self.rotor.nrotors   = Ntotal
-         self.motor.nmotors   = Ntotal 
+            group.nmotors  = nmotors
 
 #====================================================================
 # Print values to screen for a sanity check
@@ -683,13 +768,12 @@ class hydraInterface(loops                  . _loops,
          print('------------------------------------------------')
          for i in range(self.rotor.ngroups):
             group       = self.rotor.groups[i]
-            print ('%20s %2d\t | \t %s' % ('group number: ',i, group.key))
+            print ('%20s %2d\t | \t  %s' % ('group number: ',i, group.key))
             print ('  number of rotors:      | \t ',group.nrotors)            
 
-            if(bool(self.motor)):
-               print (' linked motor groups:    | \t ',group.motor_group_id)
+            print (' linked xmsn groups:     | \t ',group.xmsn_group_id)
 
-         if(bool(self.wing)):
+         if(self.wing.ngroups > 0):
 
             print( ' linked wing  groups:    | \t ',group.wing_group_ids)
             print('\n------------------------------------------------')
@@ -697,19 +781,36 @@ class hydraInterface(loops                  . _loops,
             print('------------------------------------------------')
             for i in range(self.wing.ngroups):
                group       = self.wing.groups[i]
-               print ('%20s %2d\t | \t %s' % ('group number: ',i, group.key))
-               print (' linked rotor groups:    | \t ',group.rotor_group_id)
+               print ('%20s %2d\t | \t  %s' % ('group number: ',i, group.key))
+               print (' linked rotor groups:    | \t ',self.rotor.groups[group.rotor_group_id].key)
                print (' number of wings    :    | \t ',group.nwings)
 
-         if(bool(self.motor)):
+         if(self.transmission.ngroups > 0):
             print('\n------------------------------------------------')
-            print('            Motor groups and associations     ')
+            print('        Transmission groups and associations     ')
             print('------------------------------------------------')
-            for i in range(self.motor.ngroups):
-               group       = self.motor.groups[i]
+            for i in range(self.transmission.ngroups):
+               group       = self.transmission.groups[i]
                print ('%20s %2d\t | \t %s' % ('group number',i, group.key))
-               print (' linked rotor groups:    | \t ',group.rotor_group_ids)
-               print (' number of motors   :    | \t ',group.nmotors)
+               keys        = []
+               for gid in group.rotor_group_ids:
+                  keys.append(self.rotor.groups[gid].key)
+               print (' linked rotor groups:    | \t',keys)
+               if(group.nmotors > 0):
+                  print (' number of motors   :    | \t ',group.nmotors)
+
+         if(self.powerplant.ngroups > 0):
+            print('\n------------------------------------------------')
+            print('        Powerplant groups and associations     ')
+            print('------------------------------------------------')
+            for i in range(self.powerplant.ngroups):
+               group       = self.powerplant.groups[i]
+               print ('%20s %2d\t | \t %s' % ('group number',i, group.key))
+               keys        = [] 
+               for gid in group.xmsn_group_ids:
+                  keys.append(self.transmission.groups[gid].key)
+               print (' linked xmsn groups:     | \t',keys)
+
             print('\n')
       if(self.MPI_found):
          comm.Barrier()
@@ -728,4 +829,5 @@ def find_group_id(target_key, group_class):
          print('match found: group # ',i,' has key ', key)
          return i
          break
+   print('target key is ', target_key)
    quit('ERROR: COULD NOT MAP IT! CONFIGURATION NOT VALID')

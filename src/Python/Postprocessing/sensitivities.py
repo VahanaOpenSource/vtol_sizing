@@ -261,7 +261,7 @@ class dv_sensitivities:
 #====================================================================
 
       nspd             = 11
-      ratios           = numpy.linspace(0.85,1.25,nspd)
+      ratios           = numpy.linspace(0.75,1.25,nspd)
       all_data         = numpy.zeros((nspd,nqtys))
 
 #====================================================================

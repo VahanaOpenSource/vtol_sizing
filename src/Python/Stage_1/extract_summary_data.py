@@ -48,13 +48,11 @@ class _postprocessor:
    data['span']      = max_span                             # in meters    
    data['w_crd']     = max_crd                              # in meters
       
-   data['RTF']       = 1.0 - wing.groups[0].lift_frac           # Rotor thrust fraction
-
 #=========================================================================   
 # for non-electric systems
 #=========================================================================   
 
-   data['Fuel']      = self.mass_fuel                          # Fuel  weight, kg
+   data['Fuel']      = self.powerplant.mass_fuel                          # Fuel  weight, kg
 
 #=========================================================================   
 # for electric systems: add battery weight to "fuel"
@@ -66,10 +64,7 @@ class _postprocessor:
 # 
 #=========================================================================   
 
-   data['Rthrust']      = data['RTF']*data['Wt']         # Rotor thrust in hover, kg
    data['Empty']        = self.massempty                 # Empty weight, kg
-   data['wing_LF']      = wing.groups[0].lift_frac       # Wing  lift fraction
-   data['Wlift']        = data['wing_LF']*data['Wt']     # Wing  lift, kg 
 
 #=========================================================================   
 # for invalid designs, set CTsigma to 10.0
@@ -88,17 +83,20 @@ class _postprocessor:
 # $/vehicle, $/year, $/flight hour
 #=========================================================================   
 
-   self.costs.mass_scaling_elements(self.massTakeoff, self.massEmptyGroup, self.massempty)
-   self.costs.power_scaling_elements(self.p_ins)
-   self.costs.rotor_acq_cost(self.rotor.groups)
-   self.costs.cost_accumulation(self.engine.E_operations, self.massempty, self.engine.Eins)
+   if(bool(self.costs)):
+      self.costs.mass_scaling_elements(self.massTakeoff, self.massEmptyGroup, self.massempty)
+      self.costs.power_scaling_elements(self.powerplant.p_ins)
+      self.costs.rotor_acq_cost(self.rotor.groups)
+      self.costs.cost_accumulation(self.powerplant, self.massempty)
    
 #=========================================================================   
 # calculate operating cost of vehicle in USD/flight hour
 #=========================================================================   
 
-   data['op_cost']      = self.costs.variable_costs
-
+      data['op_cost']      = self.costs.variable_costs
+   else:
+      data['op_cost']      = 0.0
+      
 #=========================================================================   
 # store data in class
 #=========================================================================   

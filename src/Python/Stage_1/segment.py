@@ -182,6 +182,10 @@ class mission_segment:
       if (self.flightmode == 'cruise' and self.time == 0):
          self.time               = self.distance/(self.cruisespeed*1.853)*60
 
+      if (self.rateofclimb == 0):
+         if(self.startalt != self.endalt):
+            self.rateofclimb     = (self.endalt-self.startalt)/self.time 
+
 #====================================================================
 # set default efficiencies for rotor in axial flight
 #====================================================================

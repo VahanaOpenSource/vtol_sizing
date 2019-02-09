@@ -10,19 +10,23 @@
 #f_lgret = 0.00       # retraction weight (0.08)
 #f_lgcw  = 0.14       # crashworthiness weight
 f_lg    = 0.0497      # landing gear weight fraction, alpha
-f_fa 	= 0.015 	  # fairing weight / vehicle weight, fraction
-W_S     = 1.0
+f_fa 	  = 0.015 	  # fairing weight / vehicle weight, fraction
 
-from conversions import *
-def alighting_weight(mass, tech_factors):
+def alighting_weight(mass, tech_factor):
 
-   fac        = tech_factors.landing_gear
+   """
+   This function calculates the weight of the alighting gear group
 
+   Input: 
+   1. mass : vehicle maximum take-off mass, kgs 
+   2. tech_factor: a scaling factor that enables modeling heavier/lighter system
+   relative to the trendline
+   """
 #====================================================================
 # fractional weight based on max GTOW:
 #====================================================================
 
-   mass_lg    = mass*f_lg*fac
+   mass_lg    = mass*f_lg*tech_factor
    mass_fair  = mass*f_fa
    total 	  = mass_lg + mass_fair
    wght_lg 	  = {'structure':mass_lg, 'fairing': mass_fair, 'total': total}
@@ -32,6 +36,7 @@ def alighting_weight(mass, tech_factors):
 # qbp
 #====================================================================
 
+# W_S     = 1.0
 #   if (aircraftID ==5):
 #      num_lg = 4
 

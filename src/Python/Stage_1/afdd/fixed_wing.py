@@ -19,15 +19,14 @@ taper       = 0.8
 from conversions import *
 from motor_mount_mass import motor_mount_mass as mmmass, spar_mass
 import numpy
-def fixed_wing_wt(vehicle_parameters, wing, rotor, motor):
+def fixed_wing_wt(wing, rotor, fuselage):
 
    Wt          = vehicle_parameters['gtow']        # in lbs
    fac         = vehicle_parameters['tech_factors'].wing
-   nr          = vehicle_parameters['nrotor']
    P           = vehicle_parameters['pwr_installed']*hp2kw
-   l_fus       = vehicle_parameters['l_fus']
-   b_fus       = vehicle_parameters['b_fus']*f2m
-   clearance   = vehicle_parameters['clearance']      # spanwise clearance/radius from rotor to fuselage/another rotor
+   l_fus       = fuselage.length
+   b_fus       = fuselage.width
+   clearance   = fuselage.clearance
    red         = vehicle_parameters['wt_redund']
 
 #====================================================================

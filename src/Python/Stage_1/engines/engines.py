@@ -1,18 +1,9 @@
 #====================================================================
-# Engine model (courtesy of Dylan Jude and Brent Mills from
-#               2017 AHS Elysium design team)
+# Function to calculate fuel weight per segment and installed power req
 #====================================================================
 
 import os,sys
 import numpy as np
-
-from turboshaft         import turboshaft
-from electric_motor     import electric_motor
-from turbo_electric     import turbo_electric
-from piston_electric    import piston_electric
-from diesel             import diesel 
-from stuttgart_diesel   import stuttgart_diesel
-from piston             import piston 
 
 #====================================================================
 # part of hydra class (i.e., self refers to hydra)
@@ -20,31 +11,6 @@ from piston             import piston
 
 class _engines:
    
-   # initialization
-   def initEngine(self):
-      
-      etype = self.etype
-   
-      if etype == 'turboshaft':
-         self.engine = turboshaft(self.emp_data)
-      elif etype == 'hybrid':
-         self.engine = hybrid(self.emp_data)
-      elif etype == 'electric_motor':
-         self.engine = electric_motor(self.emp_data)
-      elif etype == 'turbo_electric':
-         self.engine = turbo_electric(self.emp_data)
-      elif etype == 'piston_electric':
-         self.engine = piston_electric(self.emp_data)
-      elif etype == 'piston':
-         self.engine = piston(self.emp_data)
-      elif etype == 'diesel':
-         self.engine = diesel(self.emp_data)
-      elif etype == 'stuttgart':
-         self.engine = stuttgart_diesel(self.emp_data)
-      else:
-         print ('unknown engine type: what to do? SAVE ME ! CRITICAL ERROR')
-         sys.exit(1)
- 
 #====================================================================
 # wrapper function
 #====================================================================
@@ -53,13 +19,15 @@ class _engines:
 
       iseg = segID - 1
 
-      mission      = self.mission                        # mission segment data structure
-      aircraft     = self.all_dict['aircraft']
-      fuel_tech    = self.emp_data.Tech_factors.Weight_scaling.fuel
-      rotor        = self.rotor
-      wing         = self.wing
-      motor        = self.motor 
-      eta_xmsn     = self.engine.eta_xmsn
+      mission        = self.mission                        # mission segment data structure
+      aircraft       = self.all_dict['aircraft']
+      fuel_tech      = self.emp_data.Tech_factors.Weight_scaling.fuel
+      rotor          = self.rotor
+      transmission   = self.transmission
+      powerplant     = self.powerplant
+      wing           = self.wing 
+      fuselage       = self.fuselage 
+      emp_data       = self.emp_data
 
 #====================================================================
 # segment properties
@@ -72,121 +40,176 @@ class _engines:
       delta        = segment.delta         # pressure    ratio wrt MSL
 
 #====================================================================
-# Total energy used in this segment: use to size the battery 
+# Look at all the transmissions in the system, and identify the most 
+# power-hungry/torque-hungry rotor group; use that value to size the 
+# electric motor for an electric transmission
 #====================================================================
 
-      P_rotors     = 0.0
-      P_engine     = 0.0
-      ngroups      = wing.ngroups
-      for i in range(ngroups):
-         group             = wing.groups[i]
-         rotor_group_ids   = group.rotor_group_id 
-         nrotors           = group.nrotors 
-
-#====================================================================
-# assume all rotors in this group operate at the same power setting
-#====================================================================
-
-         P_rotors          = P_rotors + group.rotor_power[iseg]*nrotors      
-         P_engine          = P_engine + group.motor_power[iseg]*nrotors
-      segment.p_req        = P_rotors*0.001
-      segment.p_eng        = P_engine
-      segment.energy       = P_engine*time*0.001/60.0        # kWh
-
-#====================================================================
-# rotor power required estimates: look at each rotor group
-#====================================================================
-
-      ngroups      = rotor.ngroups
+      ngroups      = transmission.ngroups
 
       for i in range(ngroups):
-         group     = rotor.groups[i]
-         wgrp_id   = group.wing_group_ids          # all wing groups carrying this rotor group
-         p_req     = 0.0
+         tgroup     = transmission.groups[i]
+         
+         if(tgroup.type == 'electric'):
 
 #====================================================================
-# see max power required for a rotor from this group, based on all the 
-# wings that carry a rotor from this group
-# Note that this value is segment-specific so will keep changing
+# loop over all the rotor groups powered by this electric transmission
+# (defined as motor + wires, and optionally a generator)
 #====================================================================
 
-         for iwg in wgrp_id:
-            p_req  = max(p_req,wing.groups[iwg].rotor_power[iseg])
+            for rgid in tgroup.rotor_group_ids:
+               p_req     = 0.0
+               q_req     = 0.0
 
-         p_req             = 0.001*p_req                       # kW, per rotor
-         group.p_req       = p_req                             # power reqd per unit, for each rotor group
+               rgroup    = rotor.groups[rgid]
 
 #====================================================================
-# calculate power output required from the engine
-# find motor efficiency
+# Examine the expected thrust/torque for the rotor, looking at all 
+# support structures (wings, fuselage) that a rotor from this group 
+# is mounted on
 #====================================================================
 
-         imotor            = group.motor_group_id
-         if(flightMode == 'hover'):
-            xmsn_eta       = motor.groups[imotor].hover_efficiency
+               for iwg in rotor.groups[rgid].wing_group_ids:
+                  p_req  = max(p_req, wing.groups[iwg].rotor_power[iseg] )
+                  q_req  = max(q_req, wing.groups[iwg].rotor_torque[iseg])
+
+#====================================================================
+# check if this rotor is mounted on the fuselage too..
+# if so, look at power and torque of those rotors to calculate max P,Q
+#====================================================================
+
+               if(rgroup.fuse_group_id != -1):
+                  p_req  = max(p_req,fuselage.rotor_power[iseg])
+                  q_req  = max(q_req,fuselage.rotor_torque[iseg])
+   
+            p_req             = 0.001*p_req           # kW, per rotor
+
+            etainv      = 1.0/tgroup.eta
+            if(segment.flightmode == 'hover'):
+               etainv   = etainv/tgroup.motor_eta_hover
+            else:
+               etainv   = etainv/tgroup.motor_eta_cruise
+
+#====================================================================
+# set motor installed power, torque for this transmission
+#====================================================================
+
+            tgroup.motor_p_inp[iseg] = p_req * rgroup.Q_overload*etainv  # power  input to motor
+            tgroup.motor_p_out[iseg] = p_req * rgroup.Q_overload         # power  output 
+            tgroup.motor_q_out[iseg] = q_req * rgroup.Q_overload         # torque output
+
+#====================================================================
+# assume only one type of fuel used
+#====================================================================
+
+      Fuel           = 0.0
+      TotalFlowRate  = 0.0 
+
+#====================================================================
+# loop over powerplants in the system
+# identify linked transmissions, loop over those transmissions
+# calculate total power output to all rotors, divide by xmsn efficiency
+# also find the total fuel, flow rate and energy needed from this powerplant group
+#====================================================================
+      
+      for pgid in range(powerplant.ngroups):
+         pgroup    = powerplant.groups[pgid]
+
+         P_rotors       = 0.0
+         Q_rotors       = 0.0
+         Energy         = 0.0 
+
+         for xgid in pgroup.xmsn_group_ids:
+
+            tgroup    = transmission.groups[xgid]
+            etainv    = 1.0/tgroup.eta
+
+            if(tgroup.type == 'electric'):
+               if(segment.flightmode == 'hover'):
+                  etainv   = etainv/tgroup.motor_eta_hover
+               else:
+                  etainv   = etainv/tgroup.motor_eta_cruise
+
+            
+            for irg in tgroup.rotor_group_ids:
+
+#====================================================================
+# adding tail rotor power for single MR type aircraft: 10% additional 
+# Note that the torque is not modified, because the tail transmission
+# is accounted for separately.
+#====================================================================
+               
+               if (aircraft['aircraftID'] == 1 and segment.flightmode == 'hover'):
+                  factor            = 1.1         
+               else:
+                  factor            = 1.0
+
+               P_group        = factor*tgroup.power_req[ iseg,irg]*etainv
+               Q_group        = factor*tgroup.torque_req[iseg,irg]*etainv
+
+               P_rotors       = P_rotors + P_group
+               Q_rotors       = Q_rotors + Q_group
+
+#====================================================================
+# then find rated power/torque for the powerplant and total energy 
+# in this segment; this part specifically is the powerplant output power
+# Note: loss_filter is a fraction representing how much power is lost 
+# at engine output due to filter-related losses for the air intake
+# powerHoverAccs is a fraction of the main rotor power diverted to running
+# instrumentation and avionics
+#====================================================================
+
+         if(pgroup.type == 'turboshaft'):
+            lossFilter        = emp_data.Engines.loss_filter
+            powerHoverAccs    = emp_data.Engines.powerHoverAccs
          else:
-            xmsn_eta       = motor.groups[imotor].cruise_efficiency 
+            lossFilter        = 0.0 
+            powerHoverAccs    = 0.0 
 
-#         group.powerEng    = p_req/self.engine.eta_xmsn       # power output required from source, kW
-         group.powerEng    = p_req/xmsn_eta                    # power output required from source, kW
-         group.powerTOP    = group.powerEng*group.Q_overload   # take-off power to install, kW (includes margins for safety/OMI)
+         P_plant              = P_rotors/(1.0-lossFilter)*(1.0+powerHoverAccs)
+         Energy               = P_plant*time*0.001/60.0       # in kWh
+         Q_plant              = Q_rotors
 
+         # print(tgroup.power_req[ iseg,irg],P_plant)
+         # print(Energy); input('ok energy for first segment?')
 #====================================================================
-# Now loop over motor groups and see what max power output is reqd.
-# to drive all the rotors associated with the group
-#====================================================================
-
-      ngroups         = motor.ngroups
-      total_pins      = 0.0
-      for i in range(ngroups):
-         group        = motor.groups[i]
-         rgrp_ids     = group.rotor_group_ids
-         nmotor       = group.nmotors
-
-#====================================================================
-# Find maximum installed power for this motor, when its required to 
-# power all of its associated rotor groups
+# for turboshaft engines, account for losses here due to filters
+# and additional power draw due to accessories
 #====================================================================
 
-         p_ins        = 0.0
-         for irg in rgrp_ids:
-            p_ins           = max(p_ins,rotor.groups[irg].powerTOP)     # still from one rotor
-
-         group.p_ins[iseg]  = p_ins 
-         # print('group installed power',p_ins)
-         total_pins         = total_pins + p_ins*nmotor
-      self.p_ins            = total_pins
-
-#      print('installed power is ',self.p_ins)
-         # print(p_ins);x=input('?')
-#====================================================================
-# find total installed power, SFC and fuel mass and flow rate of all
-# engines
-#====================================================================
-
-      massFuel     = 0.0
-      fuelFlowRate = 0.0
+         pgroup.P_rated[iseg] = P_plant      # power  output required from powerplant in that segment
+         pgroup.Q_rated[iseg] = Q_plant      # torque output required from powerplant in that segment
+         pgroup.E_rated[iseg] = Energy       # energy reqd from powerplant in that segment
 
 #====================================================================
-# Apply tech factor for fuel weight: interpret as better SFC for 
-# engine
+# if this powerplant is an engine, find effective SFC, total fuel mass
+# and total flow rate 
 #====================================================================
 
-      massFuel     = massFuel * fuel_tech
+         if(pgroup.type == 'turboshaft' or pgroup.type == 'piston_engine'):
+            # print(iseg, time, P_plant/1e3, flightMode, theta, delta)
+            massFuel, fuelFlowRate  = pgroup.engine_wrapper(iseg, time, P_plant, flightMode, theta, delta)
+            Fuel                    = Fuel + massFuel*fuel_tech
+            TotalFlowRate           = TotalFlowRate + fuelFlowRate
+
+      powerplant.seg_fuel[iseg]     = Fuel
+
+# remember maximum flow rate for fuel system sizing
+      powerplant.flow_rate          = max(powerplant.flow_rate, TotalFlowRate)
 
 #====================================================================
-# update segment values for power, energy, sfc and fuel consumed
+# remember total fuel consumed in this segment for mass estimation in 
+# next segment
 #====================================================================
 
-      segment.sfc             = 1000.0/self.engine.sp_energy      # kg/kW-hr; not burned but used for calculations
-      segment.fuel_mass       = massFuel               # fuel burn
+      # segment.sfc             = 1000.0/self.engine.sp_energy      # kg/kW-hr; not burned but used for calculations
+      segment.fuel_mass       = Fuel               # fuel burned in the segment, kg
 
 #====================================================================
 # update mission parameters
 #====================================================================
 
-      mission.totalenergyreqd += segment.energy
-      mission.maxfuelflowrate = max(self.maxfuelflowrate,fuelFlowRate)
+#      mission.totalenergyreqd += segment.energy
       
 #====================================================================
 # update mass segment
@@ -209,14 +232,14 @@ class _engines:
 #get mass at the end of the segment (for next segment power calcs) 
 #====================================================================
 
-      mission.segment[iseg].mass = massSegmentPrev - massFuel + addPayload
+      mission.segment[iseg].mass = massSegmentPrev - Fuel + addPayload
       # print(segID,massSegmentPrev,mission.segment[iseg].mass)
 #====================================================================
 # if weight changes over mission profile, remember this fact
 # it will decide how many times we iterate for convergence 
 #====================================================================
 
-      if abs(addPayload - massFuel)>0.001:
+      if abs(addPayload - Fuel)>0.001:
          mission.same_weight     = False 
 
       return None
@@ -225,49 +248,4 @@ class _engines:
 # calculate engine weight
 #====================================================================
 
-   def getEngineWeight(self):
-
-#====================================================================
-# Setup quantities for each motor group
-#====================================================================
-      
-      motor          = self.motor 
-      ngroups        = motor.ngroups
-      mission        = self.mission
-      tech_factors   = self.emp_data.Tech_factors.Weight_scaling
-      totalEnergy    = mission.totalenergyreqd     # in kWh
-      fac            = tech_factors.powerplant     # motor technology factor
-      battery        = tech_factors.battery        # battery technology factor
-      mwts           = {}
-      total          = 0.0
-      for i in range(ngroups):
-         group       = motor.groups[i]
-         nmotor      = group.nmotors
-         P_req       = np.amax(group.p_ins)
-
-         inputs      = {'powerReq': P_req   , 'tech_fac': fac}
-         motor_mass  = self.engine.getWeight(inputs)
-         self.motor.groups[i].motor_mass     = motor_mass
-
-         motor_mass  = motor_mass*nmotor
-         key         = 'motor_group' + str(i) 
-         mwts[key]   = motor_mass
-
-#         mount_mass  = 0.1*motor_mass                       # 10% motor mount mass
-#         self.motor.groups[i].mount_mass     = mount_mass
-#         mount_mass  = mount_mass*nmotor
-#         k2          = 'mount_group' + str(i) 
-#         mwts[k2]    = mount_mass       # fraction based on Alpha
-
-         total       = total+motor_mass#+mount_mass
-
-      mwts['total']  = total
-
-#====================================================================
-#setup input dictionary and calculate battery pack weight
-#====================================================================
-
-      inputs            = {'totalEnergy': totalEnergy,'tech_bat': battery , 'mission': mission}
-      self.engine.battery_weight(inputs)
-      # print(self.engine.m_batt);quit()
       return mwts

@@ -2,7 +2,6 @@ import sys, numpy
 from numpy import sin, cos, log10, log2, sqrt, pi
 from scipy.special import jv as besselj
 sys.path.insert(0,'../Stage_0/')
-from dict2obj import obj
 from conversions import *
 
 #====================================================================
@@ -12,7 +11,7 @@ from conversions import *
 class prop_sizing:
 
    def __init__(self, data):
-      self.num          = data['npropeller']
+      self.num          = 0         #data['npropeller']
       self.thrust       = 0.e0
       self.power        = 0.e0
 

@@ -232,3 +232,34 @@ def get_rotor_dirn(kk):
         rotDir = [-1,  1, -1,  1,  1, -1,  1, -1] # Option 3
     return rotDir 
 
+
+def get_rotor_dirn_v2(kk):
+    """
+    this function gets an array of integers to specify rotor rotation directions
+    for a 6-2 tilt-wing layout
+
+    Input: 
+    kk:  1 to 7, integer 
+
+    Output:
+    rotDir: array of 8 integers with entries as "+1" (CCW) or "-1" (CW)
+
+    """
+    if kk == 1:
+        rotDir = [ 1, -1,  1, -1,  1, -1, -1,  1] # Option 1
+    elif kk == 2:
+        rotDir = [ 1, -1,  1, -1,  1, -1,  1, -1] # Option 2
+    elif kk == 3:
+        rotDir = [-1, -1,  1, -1,  1,  1, -1,  1] # Option 3
+    elif kk == 4:
+        rotDir = [-1, -1,  1, -1,  1,  1,  1, -1] # Option 4
+    elif kk == 5:
+        rotDir = [-1, -1, -1,  1,  1,  1,  1, -1] # Option 5
+    elif kk == 6:
+        rotDir = [ 1,  1,  1, -1, -1, -1,  1, -1] # Option 6
+    elif kk == 7:
+        rotDir = [ 1,  1,  1, -1, -1, -1, -1,  1] # Option 7
+    else:
+        print('unknown value of kk: defaulting to best known layout')
+        rotDir = [-1,  1, -1,  1,  1, -1,  1, -1] # Option 3
+    return rotDir 

@@ -102,7 +102,7 @@ The \textbf{mission profile} is specified as a sequence of \textbf{hover} and \t
 
 \begin{figure}
 \begin{center}
-\includegraphics[width=0.75\textwidth]{images/mission.png}
+\includegraphics[width=\textwidth]{images/profile.png}
 \caption{An example mission profile}
 \label{fig:mission}
 \end{center}
@@ -561,8 +561,8 @@ The skin thickness is used to calculate the first elastic torsion frequency for 
 \subsubsection{Rotor controls}
 Unlike large rotorcraft, some eVTOLs feature low-bandwidth collective actuators and no cyclic or swashplate. In such designs, the collective pitch (e.g., for prop-rotors) is usually scheduled with airspeed, and RPM is used for feedback control. Sizing laws for these collective actuators are therefore markedly different from those used for full-scale helicopter controls. The rotor hub mass and collective pitch actuator masses scale with tip speed $V_{\rm TIP}$ (and blade chord $c$ for the actuator) as 
 \begin{align}
-M_{\rm hub} \spc ({\rm kg})\quad &= \quad 4.84 \left(\frac{V_{\rm TIP}}{171}\right)^2 \left(\frac{c}{0.82}\right) \\
-M_{\rm act} \spc ({\rm kg})\quad &= \quad 1.47 \left(\frac{V_{\rm TIP}}{171}\right)^2 \left(\frac{c}{0.82}\right)
+M_{\rm hub} \spc ({\rm kg})\quad &= \quad 4.84 \left(\frac{V_{\rm TIP}}{171}\right)^2 \left(\frac{c}{0.082}\right) \\
+M_{\rm act} \spc ({\rm kg})\quad &= \quad 1.47 \left(\frac{V_{\rm TIP}}{171}\right)^2 \left(\frac{c}{0.082}\right)
 \end{align}
 The tip speed $V_{\rm TIP}$ is in m/s and mean blade chord $c$ is in meters. 
 \subsubsection{Fixed wing controls}
@@ -630,7 +630,30 @@ where $w_{basic}$ is the basic weight of the fuselage, $w_{\rm press}$ is the we
 w_{\rm basic} = 5.896 f_{\rm ramp} \left(\frac{W_{\rm GTOW}}{1000} \right) ^ {0.4908} n_z ^ {0.1323} S_{\rm body}^{0.2544} l^{0.61}
 \end{equation}
 where $f_{\rm ramp}$ is the factor for a retractable ramp, $n_z$ is the load factor, $S_{\rm body}$ is the wetted area of the fuselage (sq. ft) and $l$ is the length of the fuselage (feet). While these terms can be defined for full-scale helicopters/tiltrotor, their definitions become increasingly challenging to interpret in the context of unconventional configurations such as an eVTOL, with very different load paths compared to helicopters. %Additionally, even if such a definition can be codified, the error in the model at small take-off weights (less than one ton) is significant (up to 10\% or more). 
-\subsubsection{Physics-based weight model}
+\subsubsection{Component build-up model}
+Another approach to estimate fuselage mass is to consider the constituent components in the airframe, and estimate the weight of each part based on the design limit loads carried by that part. These parts are 
+\begin{enumerate}
+\item \textbf{Skin:} using fuselage dimensions and an assumed uniform skin thickness, the skin mass is calculated using the wetted area of the skin. This wetted area is estimated as 
+\begin{equation}
+S_{\rm wet} \quad = \quad 4\pi \left[\frac{(l_f h_f)^{1.6} \pls (b_f l_f)^{1.6} \pls (b_fh_f)^{1.6}}{3}\right]^{\frac{1}{1.6}}
+\end{equation}
+The skin consists of paint, core, glue and carbon fiber. The mass of the fuselage skin is therefore
+\begin{equation}
+M_{\rm skin} \quad = \quad (\rho_{\rm carbon} t_{\rm carbon} \pls \rho_{\rm glue} t_{\rm glue} \pls \rho_{\rm core} t_{\rm core} \pls \rho_{\rm paint} t_{\rm paint})
+\end{equation}
+
+\item \textbf{Canopy:} When a canopy is included, the wetted area of the canopy is assumed to be 8\% of the fuselage wetted area, and the canopy mass is calculated as 
+\begin{equation}
+m_{\rm canopy} \quad = \quad \rho_{\rm canopy} t_{\rm canopy} S_{\rm canopy}
+\end{equation}
+\item \textbf{Bulkhead:} 4 bulkheads (elliptical cross-sections) are placed along the length of the fuselage. Bulkhead mass is calculated assuming no cut-outs, as 
+\begin{equation}
+m_{\rm bulkhead} \quad = \quad 4 \left(\frac{\pi bh}{4}\right) t_{\rm bulkhead} \rho_{\rm carbon}
+\end{equation}
+\item \textbf{Keel beam:} The keel beam mass is estimated based on strength requirements, and sized to carry the following loads: (1) bending moment due to tail lift at a load factor of 3.8 and safety factor of 1.5 (2) torsion moment in the airframe due to differential wing lift of 25\% vehicle weight, and a moment arm of half-span; and finally (3) Combined vertical and lateral shear load during a 3.5 n$_z$ landing.
+\end{enumerate}
+
+\subsubsection{Physics-based weight model: load-bearing airframe components}
 A physics-based model is used to estimate the weights of load-bearing components that transmit rotor hub forces and wing lift and drag to the vehicle center of mass. The airframe is subdivided into 3-D beam elements, each with bending, axial and torsion degrees of freedom. Rotor hub loads and wing lift/drag are modeled as point loads at the motor points, and distributed uniformly over the wing span, respectively. The external loads corresponding to each mission phase are applied on the structure,  (rotor thrust, torque, wing lift and wing drag) and the resulting stresses and deflections are calculated and stored at all the nodes. Subsequently, the cross-section dimensions of the beams are iteratively resized to ensure; (i) Minimum factor of safety of 1.5 (based on Von-Mises stress) at a load factor of 3.5, (ii) A maximum deflection of 10\% for any node (relative to its distance from the vehicle center). The cross-sections of all beam elements are assumed to be hollow circles with wall thickness equal to 15\% outer radius. The only design parameter for a beam element is the outer radius of the cross-section. Beam cross-section radii for all elements are updated iteratively until the 3 design criteria are satisfied, and the weight of the airframe members is calculated using material density and final dimensions. The finite element analysis iterations are performed within the sizing loop. The parameterization for a quad-rotor layout is shown in Fig.~\ref{fig:airframe}.
 
 \begin{figure}
@@ -698,3 +721,32 @@ Fixed empty weight groups consist of mission-specific components and do not scal
 \item Low voltage battery, anti-collision lights, air data systems 
 \item High voltage bus and power distributors
 \end{enumerate}
+
+\subsection{Comparison of weights vs. NDARC}
+To validate the convergence technique, individual weight models and performance models in \hydra, the vehicle weight breakdown was obtained for a single main rotor helicopter with gas turbine engines and a mechanical transmission, and compared to values obtained from NDARC (a NASA sizing code). Table~\ref{tbl:vsNDARC} shows that less than 1\% error is obtained for most groups, while fuel is slight over-predicted by 2.8\%. 
+
+\begin{center}
+  \begin{table}[H]
+	\caption{Helicopter weight breakdown: \hydra \spc vs. NDARC}
+	\label{tbl:vsNDARC}
+	\vspace{0.5cm}
+    \begin{tabular}{ l | c | c | c }
+    \hline
+    Group weight (lb) & \hydra \spc prediction & NDARC prediction & \% difference \\ 
+    \hline
+ Gross weight & 14230 & 14243 & \textbf{0.1\%} \\
+Payload & 2500 & 2500 & -- \\
+Fuel & 1702 & 1752 & \textbf{2.9\%}  \\
+Empty weight & 9252 & 9267 & \textbf{0.16\%} \\
+Engine + accessories & 1038 & 1024 & \textbf{1.3\% }\\
+Transmission & 1316 & 1292 & \textbf{-1.82\%} \\
+Fuel system (pump, tank) & 508 & 505 & \textbf{-0.6\%} \\
+Airframe & 1304 & 1301 & \textbf{-0.2\%} \\
+Alighting gear & 461 & 463 & \textbf{0.4\%} \\
+Rotor system & 1098 & 1100 & \textbf{0.2\%} \\
+Empennage & 184 & 179 & \textbf{2.7\%} \\
+Flt. control, deicing + hydraulics & 1013 & 1013 & -- \\
+    \hline
+  \end{tabular}
+\end{table}
+\end{center}

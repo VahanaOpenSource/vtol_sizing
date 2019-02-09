@@ -22,23 +22,25 @@ class _cruisemodel:
    mission        = self.mission 
    wing           = self.wing 
    rotor          = self.rotor 
-   motor          = self.motor 
    prop           = self.prop 
+   fuselage       = self.fuselage 
+   transmission   = self.transmission
    emp            = self.emp_data
+
    masstakeoff    = self.massTakeoff
    aircraft       = self.all_dict['aircraft']
    std            = self.constants
 
-   bfus           = emp.Geometry.fuselage_width
+   bfus           = self.geometry.fuselage_width
    
 #====================================================================
 # Aircraft properties
 #====================================================================
 
    tipMachMax     = 0.9
-   nPropeller     = aircraft['npropeller'] 
-   if(nPropeller > 0):
-      quit('BANG: add cruise propeller and associated motor group')
+#   nPropeller     = aircraft['npropeller'] 
+#   if(nPropeller > 0):
+#      quit('BANG: add cruise propeller and associated motor group')
    effPropeller   = prop.eta 
 
 #====================================================================
@@ -95,13 +97,19 @@ class _cruisemodel:
    Vcruise              = segment.cruisespeed*kts2mps   # in m/s
    fsdyn                = 0.5 * segment.rho * Vcruise*Vcruise
    W                    = massSegmentPrev*grav
+   Vclimb               = segment.rateofclimb/60.0 # convert to m/s
+   alphaShaft           = arctan2(Vclimb,Vcruise)
 
 #====================================================================
 # Size wings (if required) + calculate performance
 #====================================================================
 
-   Wings_lift, Wings_f  = self.wing.cruise_sizing(W, segment, False, bfus)
-   Wing_drag            = fsdyn*Wings_f*1.05             # add 20% interference
+   if(self.wing.ngroups > 0):
+      Wings_lift, Wings_f  = self.wing.cruise_sizing(W, segment, False, bfus)
+      Wing_drag            = fsdyn*Wings_f*1.05             # add 20% interference
+   else:
+      Wing_drag            = 0.0 
+      Wings_lift           = 0.0 
 
 #====================================================================
 # Find drag of all edgewise rotors (non-prop-rotors)
@@ -122,7 +130,7 @@ class _cruisemodel:
 
    Drag                 = Fus_drag + Wing_drag + Blade_drag
    FxRotor              = Drag                  # drag force
-
+   # print(Drag,Fus_drag, Blade_drag);quit()
 #====================================================================
 # Remember cruise lift-to-drag ratio for output
 #====================================================================
@@ -159,21 +167,35 @@ class _cruisemodel:
 # calculate rotor shaft power in cruise from all groups
 #====================================================================
    
-   ngroups              = rotor.ngroups
-   P_shafts             = 0.0
+   ngroups              = wing.ngroups
+   if(fuselage.nrotors > 0):
+      ngroups           = ngroups + 1
+
    for i in range(ngroups):
-      group             = rotor.groups[i]
+      if(i < wing.ngroups):
+         src            = wing.groups[i]
+      else:
+         src            = fuselage 
+
+      rid               = src.rotor_group_id
+      group             = rotor.groups[rid]
       NR                = group.nrotors 
       rotor_fx          = FxRotor*group.Arat_thrust/NR
       rotor_fz          = FzRotor*group.Arat_lift/NR
-      alpha             = arctan2(rotor_fz, rotor_fx) 
+      alpha             = arctan2(rotor_fx, rotor_fz) + alphaShaft
+
+#====================================================================
+# get thrust required per rotor
+#====================================================================
+
+      rotor_thrust      = sqrt(rotor_fx*rotor_fx + rotor_fz*rotor_fz)
 
 #====================================================================
 # cruise propellers, or tilting rotors operating within +/- 10 deg 
-# use propulsive efficiency parameter
+# of the cruise orientation, use propulsive efficiency parameter
 #====================================================================
 
-      if(group.type == 'tilting' or group.type == 'cruise') and alpha < 0.17:
+      if(group.type == 'tilting' or group.type == 'cruise') and abs(alpha-pi*0.5) < 0.17:
          if use_bemt:
             eta         = group.rotor_aero_eta[iseg]
             quit('bang: need multi-rotor BEMT')
@@ -187,30 +209,33 @@ class _cruisemodel:
 #====================================================================
 
       else:
-         print(group.type,rotor_fx,rotor_fz,Wings_lift)
-         quit('should not be here! cruise.py, edgewise rotors detected!')
-         rotorPower     = hydra.rotorpower(Vcruise,  \
-                             alpha, Total_thrust, cruise_tipspeed,rho,rotor.radius,rotor.solidity, rotor.cd0)
+         cruise_tipspeed   = group.tipspeed*group.RPM_ratio 
+         rotorPower        = hydra.rotorpower(Vcruise,  \
+                             alpha, rotor_thrust, cruise_tipspeed,rho,group.radius,group.solidity, group.cd0)
+
+#====================================================================
+# cruise rotor rotational speed, rad/s
+#====================================================================
+
+      omega             = group.tipspeed/group.radius*group.RPM_ratio
 
 #====================================================================
 # Remember rotor thrust, torque and power 
 #====================================================================
       
-      wing_ids          = group.wing_group_ids 
-      omega_cruise      = group.tipspeed*group.RPM_ratio 
-      mgid              = group.motor_group_id 
-      eta_motor         = motor.groups[mgid].cruise_efficiency
-      for wid in wing_ids:
-         wing.groups[wid].rotor_thrust[iseg] = Total_thrust
-         wing.groups[wid].rotor_power[iseg]  = rotorPower
-         wing.groups[wid].motor_power[iseg]  = rotorPower/eta_motor     
-         wing.groups[wid].rotor_torque[iseg] = rotorPower/omega_cruise
+      src.rotor_power[iseg]    = rotorPower        # power  per rotor, watts
+      src.rotor_torque[iseg]   = rotorPower/omega  # torque per rotor, Nm
+      src.rotor_thrust[iseg]   = rotor_thrust
 
 #====================================================================
-# increment total shaft power
+# get transmission group ID: rotors in a group powered by only one 
+# transmission!  remember torque, power supplied by the transmission to power this 
 #====================================================================
 
-      P_shafts          = P_shafts + rotorPower*NR 
+      xgid           = group.xmsn_group_id 
+
+      transmission.groups[xgid].power_req[iseg,rid]    = rotorPower*NR
+      transmission.groups[xgid].torque_req[iseg,rid]   = rotorPower*NR/omega
 
 #====================================================================
 # Time spent in cruise, SI (min)

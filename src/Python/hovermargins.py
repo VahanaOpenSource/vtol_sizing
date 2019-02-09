@@ -29,9 +29,9 @@ sinth       = numpy.sin(th)
 
 #==========================
 
-import numpy,time 
+import numpy,copy,time 
 from scipy.optimize import linprog
-from setup_lp import setup_lp, get_rotor_dirn
+from setup_lp import setup_lp, get_rotor_dirn,get_rotor_dirn_v2
 from run_lp import run_lp
 d2r         = numpy.pi/180.0
 g           = 9.81      # accln due to gravity, m/s^2
@@ -50,11 +50,25 @@ nrotor      = 8
 # rotor radius, shaft mounting angles wrt wing, mount locations 
 #=================================================================================
 
+#=================================================================================
+# 4-4 layout
+#=================================================================================
+
 r           = 0.75      # rotor radius, meters
 radius      = numpy.asarray([r,r,r,r,r,r,r,r])
 alpha_s     = numpy.asarray([3,5,5,3,3,1,1,3]).astype(float)
 y_rotor     = numpy.asarray([2.9,1.23,-1.23,-2.9,2.9,1.23,-1.23,-2.9])
 x_rotor     = numpy.asarray([2.125,2.125,2.125,2.125,-2.125,-2.125,-2.125,-2.125])
+
+#=================================================================================
+# 6-2 layout
+#=================================================================================
+
+r           = 0.75      # rotor radius, meters
+radius      = numpy.asarray([r,r,r,r,r,r,r,r])
+alpha_s     = numpy.asarray([3,5,5,5,5,3,3,3]).astype(float)
+y_rotor     = numpy.asarray([-4.57,-2.9,-1.23,1.23,2.9,4.57,-1.23,1.23])
+x_rotor     = numpy.asarray([1.0,1.0,1.0,1.0,1.0,1.0,-4.0,-4.0])
 
 #=================================================================================
 # Estimate effect of control surfaces to set max yaw moment
@@ -78,7 +92,7 @@ linp_dict   = setup_lp(nrotor,MzSurface,m*g)
 # Define +1 as right handed rotation about thrust direction
 #=================================================================================
 
-kkrange     = [0,1,2,3,4,5,6]
+kkrange     = [0,1]#,2,3,4,5,6]
 als         = numpy.zeros_like(alpha_s)
 
 #=================================================================================
@@ -97,8 +111,11 @@ dTdTau_arr  = numpy.asarray(dTdTau_arr)
 # wing tilt angles
 #=================================================================================
 
-fwdTiltTest = [-8,-4,-2,0,2,4,8] 
+fwdTiltTest = [-8,-4,-2,0,2,4,8]
 aftTiltTest = [-8,-4,-2,0,2,4,8]
+
+fwdTiltTest = [ -2,2]; design_fwd =  fwdTiltTest[-1]
+aftTiltTest = [  2,-2]; design_aft =  aftTiltTest[-1]
 
 #=================================================================================
 # initialize output arrays
@@ -131,7 +148,8 @@ for ii in range(nfwd):                  # loop over fore wing tilt angles
         for ik,kk in enumerate(kkrange):              # loop over rotor rotation directions
 
             kk      = kk + 1
-            rotDir  = get_rotor_dirn(kk)
+            # rotDir  = get_rotor_dirn(kk)
+            rotDir  = get_rotor_dirn_v2(kk)
 
             x,maxthr,meantau,maxQ   =  run_lp(als, rotDir, dTdTau_arr, dMzdTau, ndof, ncontrols,  \
                                               x_rotor, y_rotor, MzSurface, linp_dict)
@@ -147,7 +165,7 @@ for ii in range(nfwd):                  # loop over fore wing tilt angles
 # create plots
 #=================================================================================
  
-            if plotOn and fwdTilt == 2 and aftTilt == -8:
+            if plotOn and fwdTilt == design_fwd and aftTilt == design_aft:
                 xPos =-y_rotor
                 yPos = x_rotor
 
@@ -233,33 +251,33 @@ if nfwd > 1 and naft > 1:
 # Thrust ratio vs. yawing moment
 #=================================================================================
 
-    plt.figure()
-    plt.title('Thrust Ratio vs. Yawing Moment')
+plt.figure()
+plt.title('Thrust Ratio vs. Yawing Moment')
 
-    markers     = ['o','^','s']
-    colors      = ['2','0','1']
-    icolor      =  -1
-    imark       =  0
-    for ik,kk in enumerate(kkrange):
+markers     = ['o','^','s']
+colors      = ['2','0','1']
+icolor      =  -1
+imark       =  0
+for ik,kk in enumerate(kkrange):
 
-        icolor   = icolor + 1
-        for ift,ft in enumerate(fwdTiltTest):
-            for iat,at in enumerate(aftTiltTest):
-                if(ift == 0 and iat == 0):
-                    plt.plot(maxThrust[ift,iat,ik],maxMz[ift,iat,ik],'o',color='C'+str(colors[icolor]),marker=markers[imark],markersize=6,label='Layout ' + str(ik+1),markerfacecolor=None)
-                else:
-                    plt.plot(maxThrust[ift,iat,ik],maxMz[ift,iat,ik],'o',color='C'+str(colors[icolor]),marker=markers[imark],markersize=6,markerfacecolor=None)
+    icolor   = icolor + 1
+    for ift,ft in enumerate(fwdTiltTest):
+        for iat,at in enumerate(aftTiltTest):
+            if(ift == 0 and iat == 0):
+                plt.plot(maxThrust[ift,iat,ik],maxMz[ift,iat,ik],'o',color='C'+str(colors[icolor]),marker=markers[imark],markersize=6,label='Layout ' + str(ik+1),markerfacecolor=None)
+            else:
+                plt.plot(maxThrust[ift,iat,ik],maxMz[ift,iat,ik],'o',color='C'+str(colors[icolor]),marker=markers[imark],markersize=6,markerfacecolor=None)
 
-        if(icolor == 2):
-            icolor  = -1
-            imark   = imark+1
+    if(icolor == 2):
+        icolor  = -1
+        imark   = imark+1
 
-    plt.grid(True,linestyle=':')
-    plt.xlabel('Motor Thrust Ratio');
-    plt.ylabel('Max Yaw Moment [Nm]')
-    plt.legend(loc='best')
-    pdf.savefig()
-    plt.close()
+plt.grid(True,linestyle=':')
+plt.xlabel('Motor Thrust Ratio');
+plt.ylabel('Max Yaw Moment [Nm]')
+plt.legend(loc='best')
+pdf.savefig()
+plt.close()
     # % Design Point
     # % fwd 2, aft -8, (old fwd 0, aft -6)
     # %     i = find(fwdTiltTest == 0);

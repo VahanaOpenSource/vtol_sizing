@@ -67,7 +67,7 @@ class costs:
 # motor: cost scales with weight of motor+ESC
 #====================================================================
 
-      cost['motors']           = scaling['motors']*massEmpty['powerplant']['total']
+      cost['motors']           = scaling['motors']*massEmpty['drive_system']['total']
 
 #====================================================================
 # fuselage: cost scales with weight of fuselage structure
@@ -85,9 +85,18 @@ class costs:
 # landing gear cost scales with weight of its structure
 #====================================================================
 
+      wing_structure           = 0.0 
+      wing_actuators           = 0.0
+      wing_tilters             = 0.0
+      for k,v in massEmpty['wing'].items():
+         if k.endswith('structure'):
+            wing_structure     = wing_structure + v 
+         elif k.endswith('tilters'):
+            wing_tilters       = wing_tilters   + v 
+         elif k.endswith('actuators'):
+            wing_actuators     = wing_actuators + v 
       cost['wing_structure']   = scaling['wing_structure']*                 \
-                               ( massEmpty['wing']['structure']  +          \
-                                 massEmpty['empennage']['total'])
+                               ( wing_structure + massEmpty['empennage']['total'])
 
 #====================================================================
 # weight of wires: $11.5/kg of cable based on AWG-1 rating; 
@@ -105,8 +114,8 @@ class costs:
 # reference is Alpha vehicle actuator weight (5.7 kg for wing CS, 9.6kg for tilt)
 #====================================================================
 
-      cost['wing_flaps']       = scaling['wing_flap']    *massEmpty['wing']['actuators']
-      cost['tilt_actuators']   = scaling['tilt_actuator']*massEmpty['wing']['tilters']
+      cost['wing_flaps']       = scaling['wing_flap']    *wing_actuators
+      cost['tilt_actuators']   = scaling['tilt_actuator']*wing_tilters
 
 #====================================================================
 # Loop over entries in fixed cost and store in dictionary
@@ -259,7 +268,7 @@ class costs:
 # add up costs from different groups
 #=============================================================================
 
-   def cost_accumulation(self, Emission, massEmpty, Etotal):
+   def cost_accumulation(self, powerplant, massEmpty):
 
 #====================================================================
 # Apply acquisition cost scaling factors going from Alpha -> Beta 
@@ -295,7 +304,7 @@ class costs:
 # get variable cost components 
 #=============================================================================
 
-      self.calc_variable_costs(Emission, Etotal)                        # component build up
+      self.calc_variable_costs(powerplant.ops_energy, powerplant.rated_energy)                        # component build up
       self.variable_costs     = dict_accumulation(self.var_breakdown)   # depends on mission
       self.taxi_analysis()
 

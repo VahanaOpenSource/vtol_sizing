@@ -1,13 +1,28 @@
 Sizing:
    Rotors:
       SMR:
-         DL:         [10.03] # lb/ft2
-         # radius:     [21.676]          # use instead of DL; both give same answer
+         DL:         [10.03]         # lb/ft2
+#         radius:     [6.607]          # radius in meters
          Nb:         [4]  
          Vtip:       [213.36] # m/s
          solidity:   [0.1178]
          tip_mach:   [0.95]
          flap_freq:  [1.035]
+         cruise_rpm_ratio:  [1.0]
+   Fuselage:
+      nrotors:         [1]
+      liftfraction:    [1.0]
+
+   Powerplant:
+      TSEngine: 
+         type: 'turboshaft'
+         num:  2
+         redundancy: 0        # how many units in the group can fail and group still function
+
+   Transmission:
+      Trans1: 
+         type:       'mechanical'
+         eta:        0.98
 
 #fidelity options for weight and performance models
    ifea:               0
@@ -15,26 +30,31 @@ Sizing:
    icomprehensive:     0
    use_bemt:           False
 
-   Fuselage:
-      nrotors:         1
-
 Configuration:
-   Fuselage: 'SMR'
+   Fuselage: 'SMR'                  # which rotors are mounted on fuselage
+
+   Rotors:
+      SMR: 'Trans1'                 # transmission used to power the rotors
+
+   Transmission:                    # powerplant used to produce energy for the transmissions
+      Trans1:                       # transmission group name 
+         Powerplant: 'TSEngine'     # powerplant group name
+         PowerFraction: 1.0         # rated power fraction supplied 
 
 # note: 4k95 = 1219.2 m, ISA + 27.92 C, 6k95 = 1828.8 m, ISA + 11.88 C
 # flight mode: 0-idle, 1-hover, 3-cruise
 Mission:
-   nsegments:          6
-   flight_mode:        ['hover','cruise', 'cruise', 'cruise', 'cruise', 'cruise'] 
-   segment_type:       [  'all',   'all',    'all',    'all',    'all',    'all'] 
-   time_seg:           [      5,       5,     2.42,     8.23,     84.9,        5] # minutes
-   start_altitude:     [ 1219.2,  1219.2,   1219.2,   1828.8,   1828.8,      0.0] # m
-   end_altitude:       [ 1219.2,  1219.2,   1828.8,   1828.8,   1828.8,      0.0] # m
-   delta_temp_isa:     [  27.92,   27.92,    11.88,        0,        0,        0] # centrigrade
-   rate_of_climb:      [      0,       0,   251.86,        0,        0,        0] # m/min
-   cruise_speed:       [      0,       0,    85.33,   157.16,   159.03,    70.74] # knots
-   add_payload:        [      0,       0,        0,        0,        0,        0] # jettison/pick up additional payload
-   distance:           [      0,       0,      0.0,    39.93,    416.7,      0.0] # km
+   nsegments:          5
+   flight_mode:        [ 'hover', 'cruise', 'cruise', 'cruise', 'cruise'] 
+   segment_type:       [ 'all',    'all',    'all',    'all',    'all'] 
+   time_seg:           [      5,     2.42,     8.23,     84.9,        5] # minutes
+   start_altitude:     [ 1219.2,   1219.2,   1828.8,   1828.8,      0.0] # m
+   end_altitude:       [ 1219.2,   1828.8,   1828.8,   1828.8,      0.0] # m
+   delta_temp_isa:     [ 27.92,    11.88,         0,        0,        0] # centrigrade
+   rate_of_climb:      [      0,   251.86,        0,        0,        0] # m/min
+   cruise_speed:       [      0,    85.33,   157.16,   159.03,    70.74] # knots
+   add_payload:        [      0,        0,        0,        0,        0] # jettison/pick up additional payload
+   distance:           [      0,      0.0,    39.93,    416.7,      0.0] # km
    fixed_GTOW:         6454.0               # switch on to check indiv. components
 # 1: SMR, 3: Coax, 4: Quadrotor (needs to be improved), 5: QBP
 Aircraft:
@@ -46,16 +66,3 @@ Aircraft:
    pax_count:         0 
    common_per_pax:    0.0
    avionics:          0
-
-# rotor parameters
-   nrotor:            1
-   overlapping:       [0]
-   rotor_offset:      0
-   rotor_shaft_tilt:  0
-
-# aux thrusters
-   npropeller:        0
-
-   # engine parameters
-   nengine:           2
-   engineType:       'turboshaft'

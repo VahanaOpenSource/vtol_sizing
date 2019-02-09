@@ -8,14 +8,6 @@ margin_frac       = 0.0
 class _march_one_step:
 
 #====================================================================
-# to pass empty weight to log file.. need a better way to do this
-# maybe update currentvalues in the fortran module
-#====================================================================
-
-   def get_empty_weight(self):
-      return self.massEmptyGroup
-
-#====================================================================
 # one iteration of the sizing loop
 #====================================================================
 
@@ -28,6 +20,7 @@ class _march_one_step:
       use_bemt                      = self.all_dict['sizing']['use_bemt']
       mission                       = self.mission
       wing                          = self.wing
+      powerplant                    = self.powerplant
       prop                          = self.prop
       g                             = self.constants.grav
       kts2mps                       = self.constants.kts2mps
@@ -38,12 +31,9 @@ class _march_one_step:
       massPayload                   = mission.payload
       sizing_mode                   = mission.sizing_mode
       massTakeoff                   = self.massTakeoff
-      massFuelTotal                 = 0.0
       mission.totalenergyreqd       = 0.0
       mission.maxfuelflowrate       = 0.0
       mission.max_Peng              = 0.0
-
-      bfus                          = self.emp_data.Geometry.fuselage_width
 
 #====================================================================
 # Remember previous take-off mass
@@ -85,7 +75,9 @@ class _march_one_step:
 
          if(segment.flightmode == 'cruise' and update_c and segment.type != 'reserve'):
             W              = self.massTakeoff*g
-            if(bool(wing)):
+            if(wing.ngroups > 0):
+
+               bfus           = self.emp_data.Geometry.fuselage_width
                temp1, temp2   = wing.cruise_sizing(W, segment, update_c, bfus)
                update_c       = False 
 
@@ -148,13 +140,8 @@ class _march_one_step:
 
          self.updateFuelAndSegmentWeight(i, i_priority)
 
-#====================================================================
-# evaluate the total quantity of fuel used and
-# total power to be installed
-#====================================================================
-
-         massFuelTotal     = massFuelTotal + segment.fuel_mass
-      self.mass_fuel       = massFuelTotal
+# evaluate the total quantity of fuel and energy required 
+      powerplant.fuel_rollup()
 
 #=============================================================================
 # python based afdd model ( completely trust it for full-scale design)
@@ -198,13 +185,14 @@ class _march_one_step:
 #
          if isinstance(self.massEmptyGroup[key],dict):
             massEmpty += self.massEmptyGroup[key]['total']
-
+            # print(key,self.massEmptyGroup[key]['total'],massEmpty)
 #=============================================================================
 # not a dictionary, but only a floating point
 #=============================================================================
 
          else:
             massEmpty += self.massEmptyGroup[key]
+            # print(key,self.massEmptyGroup[key],massEmpty)
 
 #=============================================================================
 # error trap: helps debugging for negative mass
@@ -227,6 +215,7 @@ class _march_one_step:
 #=============================================================================
 
       self.massEmptyGroup['margin']    = margin_frac*massEmpty
+      # print(massEmpty);x1=input('ok empty weight total?')
       massEmpty                        = massEmpty + self.massEmptyGroup['margin']
 
 #=============================================================================
@@ -241,7 +230,7 @@ class _march_one_step:
 #=============================================================================
 
       if sizing_mode == 1:
-         self.massTakeoff           = self.massempty + massFuelTotal + massPayload + self.mass_battery
+         self.massTakeoff           = self.massempty + powerplant.mass_fuel + massPayload + powerplant.mass_battery
          error                      = abs(self.massTakeoff - old_takeoff_mass)/(old_takeoff_mass+0.01)
 
 #=============================================================================
@@ -250,16 +239,18 @@ class _march_one_step:
 #=============================================================================
 
       elif sizing_mode == 2:
-         massPayload                      = self.massTakeoff - self.massempty - massFuelTotal - self.mass_battery
+         massPayload                      = self.massTakeoff - self.massempty - powerplant.mass_fuel - powerplant.mass_battery
          error                            = abs(massPayload - old_payload_mass)/(old_payload_mass+0.01)
          mission.payload                  = massPayload     
          #print(self.massTakeoff, self.massempty,massPayload)            
+
+      print(self.massempty, massPayload)
 #====================================================================
 # run only one iteration if sizing eVTOL with no payload drop during 
 # mission, when in fixed take-off weight mode; don't need more!
 #====================================================================
 
-      if(sizing_mode == 2 and mission.same_weight and self.etype == 'electric_motor'):
+      if(sizing_mode == 2 and mission.same_weight):
             error = 0.0
 
 #====================================================================

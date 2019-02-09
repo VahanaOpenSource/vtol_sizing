@@ -13,7 +13,23 @@ Sizing:
          liftfraction:     [1]
          nrotors:          [4]
    Fuselage:
-      nrotors:      0
+      nrotors:      [0]
+      liftfraction: [0.0]
+
+   Powerplant:
+      BatteryPack: 
+         type: 'battery'
+         num:  1
+         redundancy: 0        # how many units in the group can fail and group still function
+
+   Transmission:
+      ElTrans: 
+         type:       'electric'
+         eta:           1.00
+         redundancy:    1.0   
+         Motors:
+            hover_efficiency: 0.90
+            cruise_efficiency: 0.85
 
 # fidelity options for weight and performance models
    ifea:               False     # set to 1 for beam lattice model: to be set up!
@@ -22,9 +38,14 @@ Sizing:
 #aircraft configuration: map rotors to wings
 Configuration:
    Rotors:
-      All_rotors:    'All_motors' # what motor group to use to drive a given rotor group
+      All_rotors:    'ElTrans'      # transmission used to power the rotors
    Wings:
-      Main_wing:     'All_rotors' # tell the configuration what rotor group to use on a given wing group
+      Main_wing:     'All_rotors'   # tell the configuration what rotor group to use on a given wing group
+
+   Transmission:                    # powerplant used to produce energy for the transmissions
+      ElTrans:                      # transmission group name 
+         Powerplant: 'BatteryPack'  # powerplant group name
+         PowerFraction: 1.0         # rated power fraction supplied 
 
 # note: 4k95 = 1219.2 m, ISA + 27.92 C, 6k95 = 1828.8 m, ISA + 11.88 C
 # flight mode: 0-idle, 1-hover, 3-cruise
@@ -53,12 +74,3 @@ Aircraft:
    common_equipment: 24.0        # HVAC systems - common for all PAX
    common_per_pax:   00.0
    pax_count:         0          # number of passengers (uses pax -> baggage map)
-
-   # rotor parameters ("lift" or "tilt")
-   nrotor:            8
-
-   # Cruise propeller count
-   npropeller:        0
-
-   # engine parameters
-   engineType:       'electric_motor'

@@ -1,10 +1,9 @@
 Sizing:
    Constraints: 
-      Rmax:    30.0 
+      max_rotor_radius:    30.0 
       max_gtow: 20000.0
+      max_ct_sigma: 0.14
 Empirical:
-   Transmission:
-      eta            : 0.98 # transmission efficiency
 
    Engines:
       powerHoverAccs : 0.01 # percent of total power for accessories
@@ -12,9 +11,9 @@ Empirical:
       powerAuxEquip  : 44.74  # generator, fan, pumps..  (kW)
       powerLossMGB   : 0.00 # percent loss
       effHoverPower  : 1.00 # hover power efficiencies
-      loss_filter    : 0.04
+      loss_filter    : 0.00
    
-      frac_install   : 1.00  # installation losses
+      frac_install   : 1.05  # installation losses
    
    # power lapse rates with altitude
       KD_mrp: 1.1132
@@ -29,39 +28,22 @@ Empirical:
    # fraction of installed power for hover, mcp, etc.
       fracPowerIdle: 0.2
       fracPowerIRP : 0.932
-      fracPowerMCP : 0.85
+      fracPowerMCP : 1.0
 
-
+   # rotor hover performance and body drag
    Aerodynamics:
       Rotors:
          hover_dwld_factor:    0.045
          cd0:                  0.011
          induced_power_factor: 1.15
          kint:                 1.0
-         FM:                   0.63
+         FM:                   0.75
 
       Body:
          flat_plate_factor: 4.0
 
-   # engine parameters
-
-   # miscellaneous parameters
-   fuselage_width:    6
-   clearance:         1
-
-   # design limits
+   # technology factors
    Tech_factors:
       Weight_scaling:
-         rotor:            1.0            # rotor blades
-         wing:             1.0            # wings
-         empennage:        1.0            # tail surfaces, if any (winglets for vahana config)
-         fuselage:         1.0            # 
-         landing_gear:     0.4            #  
-         fuel_system:      1.0            # 
-         drive_system:     1.0            #  
-         flight_control:   1.0            #  
-         anti_icing:       0.0            #  
-         powerplant:       0.76           # 
-         fuel:             1.0            # 
-         battery:          1.0            # 
-
+         landing_gear:     0.3523      #  
+         emergency_sys:    0.0         # group absent

@@ -75,7 +75,7 @@ def getSFC(powerReq, Pmax, delta, theta):
 # after temperature and altitude corrections
 #====================================================================
 
-  sfc        = sfc_base*sfc_corr
+  sfc        = sfc_base#*sfc_corr
 #  sfc        = sfc_base 
   
 #====================================================================

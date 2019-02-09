@@ -18,15 +18,10 @@ Ananth Sridharan \\
 Bharath Govindarajan \\
 \end{center}
 \noindent
-This is the analysis manual for the rotorcraft conceptual sizing  analysis \textbf{\hydra} - \texttt{HY}brid \texttt{D}esign and \texttt{R}otorcraft \texttt{A}nalysis, developed and evolved over several years at the University of Maryland, with inspiration  drawn from the AHS Student Design Competition challenges. This manual contains a description of the theory and various operations performed by the sizing code for both conventional and novel Vertical-Lift aircraft.
+This is the user manual for the rotorcraft conceptual sizing  analysis \textbf{\hydra} - \texttt{HY}brid \texttt{D}esign and \texttt{R}otorcraft \texttt{A}nalysis, developed and evolved over several years at the University of Maryland, with inspiration  drawn from the AHS Student Design Competition challenges. This manual contains a description of the theory and various operations performed by the sizing code for both conventional and novel Vertical-Lift platforms.
+\vspace{0.5cm}
+The key features of \hydra \spc are \textbf{flexibility}, \textbf{speed} and reliance on only \textbf{open-source tools}. With the majority of the code written in an interpreted language, i.e., \python, modules can be prototyped and added quickly. Subsequently select parts of the code can be ported to \ty{Fortran} or \ty{C} (i.e., compiled languages) and wrapped for execution sppeed. Using a combination of \ty{OpenMP}, \ty{MPI} and algorithmic acceleration, up to 2000 designs can be generated per second on a desktop workstation. The use of \python enables powerful built-in text parsing abilities, resulting in more intuitive interfaces. 
+\vspace{0.5cm}
 
-\vspace{1cm}
-
-The main advantages of \hydra \spc over other sizing codes are \textbf{flexibility}, \textbf{speed} and reliance on only \textbf{open-source tools}. With the majority of the code written in an interpreted language, i.e., \python, modules can be prototyped and added quickly. Subsequently select parts of the code can be ported to \ty{Fortran} or \ty{C} (i.e., compiled languages) and wrapped for execution sppeed. Using a combination of \ty{OpenMP}, \ty{MPI} and algorithmic acceleration, up to 2000 designs can be generated per second on a standard desktop computer with 8 cores. 
-
-\vspace{1cm}
-Another advantage of \hydra \spc is the ability to set up input decks and call higher fidelity models (BEMT, FEA for airframe and wings) and the comprehensive analysis \ty{PRASADUM}, and through the comprehensive analysis, the Maryland Free Wake (\ty{MFW}). These higher-fidelity tools are integrated into the sizing loop to provide accurate estimates of rotor performance and component weights, and may be invoked as required.
-% \large{\textbf{Implementation}} \\
-% \normalsize
-% \\
-% The most recent release of HYDRA is written in Python 3, so that the baseline analysis can be easily modified for custom applications where required. The compute-heavy modules are implemented in \textbf{Fortran90} to increase the speed of the calculations, and wrapped so that they can be called from Python. Further, HYDRA can call the comprehensive analysis PRASADUM (with its built in blade deflection and integrated Maryland Free Wake) to calculate rotor power in all flight conditions with a high-fidelity model. HYDRA was originally designed to find the best design with full parameter space exploration. Later on, HYDRA was also expanded to use Scipy's built-in constrained optimizers - ``minimize'' (gradient based) and ``differential evolution'' (similar to genetic algorithms).
+\noindent Another advantage of \hydra \spc is the ability to set up input decks and call higher fidelity models (BEMT, FEA for airframe and wings) and the comprehensive analysis \ty{PRASADUM}, and through the comprehensive analysis, the Maryland Free Wake (\ty{MFW}). These higher-fidelity tools are integrated into the sizing loop to provide accurate estimates of rotor performance and component weights, and may be invoked as required.
+\vspace{0.5cm} 

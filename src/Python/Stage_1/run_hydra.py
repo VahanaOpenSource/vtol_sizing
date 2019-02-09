@@ -44,23 +44,18 @@ class _run_hydra:
          self.resetMaterialProperties()
 
       self.p_ins        = 1.e-3
-#======================================================================
-# reset segment information
-#======================================================================
 
+# reset segment information
       mission           = self.mission
       self.massTakeoff  = mission.mass_takeoff_guess()
-      
-#======================================================================
-# interpret inputs and populate class structures: done once per case
-#======================================================================
 
+# reset powerplant properties
+      self.powerplant.reset() 
+      
+# interpret inputs and populate class structures: done once per case
       self.interpret_inputs()
 
-#======================================================================
 # perform iterations till convergence
-#======================================================================
-   
       this_blade     = {}
       self.iterate_design(this_blade, False) 
 
@@ -156,16 +151,35 @@ class _run_hydra:
          Propellers        = empirical.Aerodynamics.Propellers 
          prop.eta          = Propellers.eta 
       except:
-         pass 
+         prop.eta          = 0.82         # assign default value
+
+#====================================================================
+# rotor performance: empirical models
+#====================================================================
+
+      emp_rotors        = empirical.Aerodynamics.Rotors
+
+#====================================================================
+# for rotors mounted on fuselage: set lift fraction
+#====================================================================
+
+      if(self.fuselage.nrotors >0):
+         self.fuselage.lift_frac    = aircraft['fuselage']['liftfraction']
+
+         for iseg in range(nseg):
+            segment     = mission.segment[iseg]
+            flightmode  = segment.flightmode
+            if(flightmode == 'hover'):
+               self.fuselage.rotor_aero_eta[iseg]  = emp_rotors.FM
+            else:
+               self.fuselage.rotor_aero_eta[iseg]  = prop.eta
          
 #====================================================================
 # Wing operating condition and geometry
 #====================================================================
 
-      emp_rotors        = empirical.Aerodynamics.Rotors
-
 #empirical parameters for wing
-      if(bool(self.wing)):
+      if(self.wing.ngroups >0):
          emp_wings         = empirical.Aerodynamics.Wings 
    
 #from sizing inputs   
@@ -182,7 +196,6 @@ class _run_hydra:
             w.cd0          = emp_wings.cd0
             w.nwings       = Wing['nwing']
             w.cl           = Wing['cl']
-#            w.K            = 1.0/(numpy.pi*w.aspectratio*w.oswald)
 
 #====================================================================
 # Loop over mission segments and set rotor aerodynamic efficiency defaults

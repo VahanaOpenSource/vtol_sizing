@@ -8,9 +8,10 @@ from conversions import *
 # ALL UNITS IN IMPERIAL
 #====================================================================
 
-ng      = 3.8   # Max g lift
-nl      = 3.5   # Landing load factor
-sf      = 1.5   # Safety factor
+ng          = 3.8       # Max g lift
+nl          = 3.5       # Landing load factor
+sf          = 1.5       # Safety factor
+nz          = 3.8       # load factor
 
 uni_rho     = 1660      # Uni density [kg/m^3]
 uni_stress  = 450e6     # Uni ultimate stress [Pa]
@@ -34,18 +35,7 @@ steel_shear = 500e6 #Bolt shear strength
 
 arealWeight = bid_minThk*bid_rho+core_minThk*core_rho+paint_thk*paint_rho
 
-def fuselage_v2(vehicle_parameters):
-
-#====================================================================
-# unpack inputs
-#====================================================================
-   
-  aircraftID = vehicle_parameters['aircraftID']      
-  gtow       = vehicle_parameters['gtow']        # lbs
-  nz         = 3.8                               # loa factor
-  fac        = vehicle_parameters['tech_factors'].fuselage
-  wing       = vehicle_parameters['wing']
-  l_fus      = vehicle_parameters['l_fus']       # ft 
+def fuselage_v2(gtow, fac, wing, length):
 
 #====================================================================
 # number of rotors on the wing: decides weight fraction carried in 
@@ -64,10 +54,6 @@ def fuselage_v2(vehicle_parameters):
 # GB/ZL fuselage model
 #====================================================================
    
-  length  = l_fus
-#  length  = l_fus*0.3048             # fuselage length in meters
-#  width   = b_fus*0.3048             # width of fuselage in meters
-#  height  = b_fus*0.3048             # height in meters
   weight  = gtow/2.2*9.81             # vehicle weight in Newtons
 
   width   = 1.55
@@ -139,12 +125,12 @@ def fuselage_v2(vehicle_parameters):
 # Apply tech factors 
 #====================================================================
 
-  fac          = fac*1.2                # add 20% for fasteners, etc
+  factor       = fac*1.2                # add 20% for fasteners, etc
 
-  mass_skin    = m_skin       * fac
-  mass_keel    = massKeel     * fac
-  mass_bulkh   = bulkheadMass * fac
-  mass_canopy  = canopyMass   * fac
+  mass_skin    = m_skin       * factor
+  mass_keel    = massKeel     * factor
+  mass_bulkh   = bulkheadMass * factor
+  mass_canopy  = canopyMass   * factor
 
   total      =  mass_skin + mass_keel + mass_bulkh + mass_canopy 
 

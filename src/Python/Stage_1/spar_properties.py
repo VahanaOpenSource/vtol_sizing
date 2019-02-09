@@ -20,7 +20,7 @@ def spar_properties(material):
     spar['tau_y']   =  207.0e6                 # yield shear strs,Pa
 
 #source: http://www.acpsales.com/upload/Mechanical-Properties-of-Carbon-Fiber-Composite-Materials.pdf
-  elif(material == 'uniaxial_carbon'):
+  elif(material == 'isolated_uniaxial_carbon'):
     spar['rho']     = 1660.0e0                 # density,         kg/cu.m
     # spar['sigma_y'] = 1200.0e6                 # ult. T/C stress, Pa 
     spar['sigma_y'] =  450.0e6                 # from Zach uni carbon below

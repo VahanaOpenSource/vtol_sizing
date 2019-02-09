@@ -7,17 +7,7 @@ Sizing:
 
 #Empirical modeling parameters
 Empirical:
-# transmission
-   Transmission:
-      eta:              1.00     # line transmission efficiency
-
-#motor efficiencies
-   Motors:
-      All_motors:
-         hover_efficiency: 0.90
-         cruise_efficiency: 0.85
-
-#battery 
+# battery 
    Battery: 
       Cell:
          sp_energy:   240.0      # measured in W-hr/kg
@@ -30,27 +20,6 @@ Empirical:
          integ_fac:     0.75     # battery pack integration factor for mass 
          vol_fac:       0.3      # battery volume integration factor 
       Force_sizing:     'energy' # don't worry about cell count or temperature effects      
-
-# engine 
-   Engines:
-      loss_filter:       0.00   # loss filter for engine - nothing for motor?
-      power_accs:        0.00   # accessories power - done with LV battery 
-      power_aux_equip:  00.00   # generator, fan, pumps..  (kW)
-      power_loss_mgb:    0.00   # percent loss
-      eff_hover_power:   1.00  # ratio of hover to cruise motor efficiencies
-      frac_install:      1.00   # installation losses
-   
-      KD_mrp: 1.0000          # lapse rate with altitude
-      KD_irp: 1.0000
-      KD_mcp: 1.0000
-
-      KT_mrp: 1.0000          # lapse rate with temperature
-      KT_irp: 1.0000
-      KT_mcp: 1.0000
-
-      fracPowerIdle: 0.1      # power margins
-      fracPowerIRP : 0.80     # power margin, intermediate condition
-      fracPowerMCP : 0.66     # how much of installed power fraction to use at continuous operation     
 
 # Aerodynamic parameters
    Aerodynamics:
@@ -83,18 +52,9 @@ Empirical:
 # Empty weight: scaling factors for built-in equations to get sensitivity studies
    Tech_factors:
       Weight_scaling:
-         rotor:            1.0            # rotor blades
-         wing:             0.9           # wings
-         empennage:        1.0            # tail surfaces, if any (winglets for vahana config)
-         fuselage:         1.0            # 
+         wing:             0.9            # wings
          landing_gear:     0.4            #  
-         fuel_system:      1.0            # 
-         drive_system:     1.0            #  
-         flight_control:   1.0            #  
          anti_icing:       0.0            #  
-         powerplant:       0.76           # 
-         fuel:             1.0            # 
-         battery:          1.0            # 
 
 Acquisition:
    Fixed_cost:
